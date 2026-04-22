@@ -1,0 +1,9 @@
+{
+  "scenes": [
+    {
+      "id": "candlekeep_intro",
+      "title": "Arrival at Candlekeep",
+      "location_id": "candlekeep_gate"
+    }
+  ]
+}

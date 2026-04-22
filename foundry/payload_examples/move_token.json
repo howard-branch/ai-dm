@@ -1,0 +1,6 @@
+{
+  "type": "move_token",
+  "token_id": "token_123",
+  "x": 1000,
+  "y": 800
+}

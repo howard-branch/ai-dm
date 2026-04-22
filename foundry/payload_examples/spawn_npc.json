@@ -1,0 +1,7 @@
+{
+  "type": "spawn_npc",
+  "actor_id": "npc_001",
+  "scene_id": "scene_001",
+  "x": 500,
+  "y": 600
+}

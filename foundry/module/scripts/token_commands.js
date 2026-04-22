@@ -1,0 +1,94 @@
+export async function moveToken(tokenId, x, y) {
+  const scene = game.scenes?.current;
+  if (!scene) {
+    throw new Error("No current scene available");
+  }
+
+  const existing =
+      scene.getEmbeddedDocument?.("Token", tokenId) ??
+      scene.tokens?.get?.(tokenId);
+
+  if (!existing) {
+    throw new Error(`Token not found in current scene ${scene.id}: ${tokenId}`);
+  }
+
+  const updated = await scene.updateEmbeddedDocuments("Token", [
+    { _id: tokenId, x, y }
+  ]);
+
+  if (!updated?.length) {
+    throw new Error(`Failed to move token: ${tokenId}`);
+  }
+
+  return updated[0];
+}
+
+export async function spawnToken(sceneId, actorId, x, y, name = null) {
+  const scene = game.scenes?.get(sceneId);
+  if (!scene) {
+    throw new Error(`Scene not found: ${sceneId}`);
+  }
+
+  const actor = game.actors?.get(actorId);
+  if (!actor) {
+    throw new Error(`Actor not found: ${actorId}`);
+  }
+
+  const tokenDoc = await actor.getTokenDocument({
+    x,
+    y,
+    name: name ?? actor.name,
+  });
+
+  const created = await scene.createEmbeddedDocuments("Token", [
+    tokenDoc.toObject()
+  ]);
+
+  if (!created?.length) {
+    throw new Error(`Failed to create token for actor: ${actorId}`);
+  }
+
+  return created[0];
+}
+
+export async function deleteToken(sceneId, tokenId) {
+  const scene = sceneId ? game.scenes?.get(sceneId) : game.scenes?.current;
+  if (!scene) {
+    throw new Error(`Scene not found: ${sceneId ?? "<current>"}`);
+  }
+
+  const existing =
+      scene.getEmbeddedDocument?.("Token", tokenId) ??
+      scene.tokens?.get?.(tokenId);
+
+  if (!existing) {
+    return { deleted: false, reason: "token_not_found" };
+  }
+
+  await scene.deleteEmbeddedDocuments("Token", [tokenId]);
+  return { deleted: true };
+}
+
+export async function readToken(sceneId, tokenId) {
+  const scene = sceneId ? game.scenes?.get(sceneId) : game.scenes?.current;
+  if (!scene) {
+    throw new Error(`Scene not found: ${sceneId ?? "<current>"}`);
+  }
+
+  const token =
+      scene.getEmbeddedDocument?.("Token", tokenId) ??
+      scene.tokens?.get?.(tokenId);
+
+  if (!token) {
+    return null;
+  }
+
+  return {
+    id: token.id,
+    sceneId: scene.id,
+    name: token.name,
+    actorId: token.actorId,
+    x: token.x,
+    y: token.y,
+  };
+}

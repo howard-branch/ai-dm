@@ -1,0 +1,7 @@
+{
+  "type": "update_actor",
+  "actor_id": "actor_001",
+  "patch": {
+    "system.attributes.hp.value": 10
+  }
+}

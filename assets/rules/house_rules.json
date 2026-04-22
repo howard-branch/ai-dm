@@ -1,0 +1,12 @@
+{
+  "house_rules": [
+    {
+      "id": "raw_crit_double_dice",
+      "applies_to": "damage",
+      "override": {"crit_doubles_dice": true},
+      "priority": 0,
+      "description": "Standard 5e: critical hits double the damage dice (not the modifier).",
+      "enabled": true
+    }
+  ]
+}

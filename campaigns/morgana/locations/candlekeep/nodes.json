@@ -1,0 +1,9 @@
+{
+  "nodes": [
+    {
+      "id": "candlekeep_gate",
+      "name": "The Gate",
+      "description": "The entrance to Candlekeep."
+    }
+  ]
+}

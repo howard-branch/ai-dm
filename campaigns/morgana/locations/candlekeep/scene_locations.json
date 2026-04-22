@@ -1,0 +1,20 @@
+[
+  {
+    "scene_id": "scene-candlekeep-gate",
+    "anchors": [
+      { "id": "anchor.altar", "name": "altar", "scene_id": "scene-candlekeep-gate", "x": 1200, "y": 800, "tags": ["sacred"] },
+      { "id": "anchor.main_door", "name": "main_door", "scene_id": "scene-candlekeep-gate", "x": 200, "y": 1500, "tags": ["entrance"] }
+    ],
+    "zones": [
+      {
+        "id": "zone.library_north_wing",
+        "name": "library_north_wing",
+        "scene_id": "scene-candlekeep-gate",
+        "shape": "rect",
+        "rect": [800, 200, 2000, 1200],
+        "tags": ["quiet"]
+      }
+    ]
+  }
+]
+

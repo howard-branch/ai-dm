@@ -1,0 +1,12 @@
+id: morgana
+name: "The Morgana Chronicle"
+version: 0.1.0
+
+# Optional override map. Keys mirror CampaignPaths properties; values
+# are paths relative to this manifest's directory. Omit a key to use
+# the default layout.
+overrides: {}
+
+entrypoints:
+  first_chapter: chapter_01
+

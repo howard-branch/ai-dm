@@ -1,0 +1,94 @@
+app:
+  name: ai-dm
+  environment: development
+
+audio:
+  tts_voice: en-GB-SoniaNeural
+  always_listening: false
+
+ai:
+  model: gpt-5
+  temperature: 0.8
+
+foundry:
+  enabled: false
+  host: localhost
+  port: 30000
+  relay_url: ws://127.0.0.1:8765
+  queue:
+    max_pending: 32
+    default_timeout_s: 10
+    scope: scene   # or "global"
+  validator:
+    max_coordinate: 20000
+    actor_patch_allow:
+      - name
+      - img
+      - system.attributes.
+      - system.details.
+      - system.traits.
+  batch:
+    atomic_default: true
+    timeout_s: 30
+
+persistence:
+  saves_dir: data/saves            # legacy; ignored when `campaigns.active` is set
+  campaign_assets: assets/campaign # legacy; ignored when `campaigns.active` is set
+  max_backups: 20
+  auto_load: false
+  auto_save_on_shutdown: false
+
+# ---- Pluggable campaigns --------------------------------------------- #
+# Selecting a campaign is a single-key change. `active` may be either a
+# slug (looked up under `root`) or a path to a pack directory. All
+# per-campaign mutable state (live characters, saves, backups, memory)
+# is written under `<state_root>/<slug>/`, keeping the pack itself
+# read-only and distributable.
+campaigns:
+  root: campaigns
+  active: morgana
+  state_root: data/campaigns
+
+memory:
+  npc_max_events: 50
+
+combat:
+  auto_highlight: true
+
+# ---- Phase 3 ----
+
+rules:
+  assets_dir: assets/rules
+  house_rules_path: assets/rules/house_rules.json
+
+intent:
+  confidence_threshold: 0.6
+  default_actor_id: player
+
+triggers:
+  enabled: true
+  # Triggers ship inside the active campaign pack
+  # (campaigns/<active>/triggers/). The legacy assets_dir below is
+  # ignored when `campaigns.active` is set.
+  assets_dir: assets/campaign/triggers
+
+planner:
+  enabled: true
+
+foundry_inbound:
+  enabled: true
+  reconcile_on_chapter_advance: true
+
+# Authority model: Python is authoritative.
+# Per-event policy for GM-side mutations that arrive via the inbound bridge:
+#   absorb  — accept the change into Python state (default)
+#   revert  — push the inverse command back to Foundry
+#   ignore  — log only
+authority:
+  echo_suppression_ttl: 3.0
+  policy:
+    token_moved: absorb
+    actor_updated: absorb
+    scene_activated: absorb
+    default: ignore
+

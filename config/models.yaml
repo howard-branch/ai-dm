@@ -1,0 +1,16 @@
+narrator:
+  provider: openai
+  model: gpt-5
+
+planner:
+  provider: openai
+  model: gpt-5-mini
+
+intent_parser:
+  provider: openai
+  model: gpt-5-mini
+
+triggers:
+  # Author triggers as YAML/JSON under assets/campaign/triggers/
+  enabled: true
+

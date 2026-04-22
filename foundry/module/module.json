@@ -1,0 +1,27 @@
+{
+  "id": "ai-dm-bridge",
+  "title": "AI DM Bridge",
+  "description": "Socket bridge for AI DM integration",
+  "version": "0.1.0",
+  "compatibility": {
+    "minimum": "12",
+    "verified": "12"
+  },
+  "authors": [
+    {
+      "name": "Your Name"
+    }
+  ],
+  "esmodules": [
+    "scripts/socket_bridge.js"
+  ],
+  "relationships": {
+    "requires": [
+      {
+        "id": "socketlib",
+        "type": "module",
+        "compatibility": {}
+      }
+    ]
+  }
+}
