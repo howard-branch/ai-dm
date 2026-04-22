@@ -54,6 +54,11 @@ class CreateActorCommand(BaseCommand):
     type: Literal["create_actor"] = "create_actor"
     name: str
     actor_type: str = "npc"
+    # Optional dnd5e (or other system) data merged into the new actor
+    # via Actor.create / actor.update. Use dotted keys (e.g.
+    # "system.attributes.hp.max") to target nested fields.
+    system: dict = Field(default_factory=dict)
+    img: str | None = None
 
 
 # ------------------------------------------------------------------ #

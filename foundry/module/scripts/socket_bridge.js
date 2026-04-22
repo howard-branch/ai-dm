@@ -71,7 +71,8 @@ async function handleCommand(command) {
       case "create_actor": {
         const actor = await createActor(
             command.name,
-            command.actor_type || "npc"
+            command.actor_type || "npc",
+            { system: command.system || null, img: command.img || null }
         );
         return { ok: true, command_type: command.type, actorId: actor.id, actorName: actor.name };
       }

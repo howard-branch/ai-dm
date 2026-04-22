@@ -18,6 +18,7 @@ from ai_dm.ai.planner import StoryPlanner
 from ai_dm.audio.audio_queue import AudioQueue
 from ai_dm.audio.narration_dispatcher import NarrationDispatcher
 from ai_dm.audio.playback import play_bytes, play_stream
+from ai_dm.audio.speech_input import SpeechInput
 from ai_dm.audio.tts import NullBackend, TTSBackend, default_backend
 from ai_dm.audio.voices import VoiceProfile
 from ai_dm.campaign.pack import CampaignPack, seed_characters
@@ -79,6 +80,10 @@ class ContainerConfig:
     audio_enabled: bool = False  # off by default for tests / headless
     audio_backend: TTSBackend | None = None  # injectable for tests
     edge_voice: str = "en-GB-SoniaNeural"
+    # Speech-to-text input (push-to-talk via the runtime). Off by
+    # default; the runtime enables it lazily on first use so tests
+    # don't pull in audio deps.
+    speech_input_enabled: bool = True
     intent_confidence_threshold: float = 0.6
     triggers_enabled: bool = True
     inbound_foundry_enabled: bool = True
@@ -132,6 +137,7 @@ class Container:
     tts: Optional[TTSBackend] = None
     audio_queue: Optional[AudioQueue] = None
     narration_dispatcher: Optional[NarrationDispatcher] = None
+    speech_input: Optional[SpeechInput] = None
     voices: Optional[VoiceProfile] = None
     journal: Optional[JournalService] = None
     reconciler: Optional[Reconciler] = None
@@ -271,6 +277,15 @@ class Container:
         if cfg.audio_enabled:
             narration_dispatcher.start()
 
+        # Speech input is constructed lazily-light: probing for ffmpeg
+        # / arecord etc. is cheap and does not import any heavy deps.
+        speech_input: SpeechInput | None = None
+        if cfg.speech_input_enabled:
+            try:
+                speech_input = SpeechInput()
+            except Exception:  # noqa: BLE001
+                speech_input = None
+
         # ---- Triggers ---- #
         flags: dict[str, Any] = {}
         actor_state: dict[str, Any] = {}
@@ -384,6 +399,7 @@ class Container:
             tts=tts,
             audio_queue=audio_queue,
             narration_dispatcher=narration_dispatcher,
+            speech_input=speech_input,
             voices=voices,
             journal=journal,
             reconciler=reconciler,

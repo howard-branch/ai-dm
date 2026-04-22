@@ -24,9 +24,38 @@ from typing import Iterable, Iterator
 logger = logging.getLogger("ai_dm.audio.playback")
 
 # (binary, args) — all read audio from stdin; format is autodetected.
+#
+# Players are tuned for low time-to-first-sound. The defaults of most
+# media players buffer 1–5s before starting playback (probesize /
+# analyzeduration / cache); we override those so the first MP3 frame
+# decoded is the first frame heard.
 _PLAYERS: list[tuple[str, list[str]]] = [
-    ("ffplay",  ["-nodisp", "-autoexit", "-loglevel", "quiet", "-i", "pipe:0"]),
-    ("mpv",     ["--really-quiet", "--no-video", "-"]),
+    (
+        "ffplay",
+        [
+            "-nodisp",
+            "-autoexit",
+            "-loglevel", "quiet",
+            "-probesize", "32",
+            "-analyzeduration", "0",
+            "-fflags", "nobuffer+discardcorrupt",
+            "-flags", "low_delay",
+            "-sync", "ext",
+            "-i", "pipe:0",
+        ],
+    ),
+    (
+        "mpv",
+        [
+            "--really-quiet",
+            "--no-video",
+            "--cache=no",
+            "--demuxer-readahead-secs=0",
+            "--audio-buffer=0.05",
+            "--untimed",
+            "-",
+        ],
+    ),
     ("mpg123",  ["-q", "-"]),
     ("paplay",  ["--raw=false"]),
     ("aplay",   ["-q", "-"]),

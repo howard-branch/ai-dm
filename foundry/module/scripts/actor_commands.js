@@ -10,19 +10,72 @@ function resolveActor(actorIdOrName) {
   );
 }
 
-export async function createActor(name, actorType = "npc") {
+// Convert dotted-path keys ("system.attributes.hp.max": 12) into a nested
+// object suitable for Actor.create. Plain (non-dotted) keys are preserved
+// as-is so callers can also pass an already-nested system patch.
+function expandDotted(patch) {
+  const out = {};
+  if (!patch || typeof patch !== "object") return out;
+  for (const [key, value] of Object.entries(patch)) {
+    if (!key.includes(".")) {
+      // Merge top-level objects rather than overwrite (so a caller may pass
+      // both `system` (object) and dotted `system.x.y` keys safely).
+      if (
+        out[key] && typeof out[key] === "object" && !Array.isArray(out[key])
+        && value && typeof value === "object" && !Array.isArray(value)
+      ) {
+        out[key] = foundry.utils.mergeObject(out[key], value, { inplace: false });
+      } else {
+        out[key] = value;
+      }
+      continue;
+    }
+    const parts = key.split(".");
+    let cur = out;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const p = parts[i];
+      if (!cur[p] || typeof cur[p] !== "object") cur[p] = {};
+      cur = cur[p];
+    }
+    cur[parts[parts.length - 1]] = value;
+  }
+  return out;
+}
+
+export async function createActor(name, actorType = "npc", options = {}) {
+  const { system = null, img = null } = options || {};
   const existing = game.actors?.find(
     (a) => (a.name || "").toLowerCase() === String(name).toLowerCase()
         && a.type === actorType
   );
   if (existing) {
+    // Re-sync: push any provided system/img data onto the existing actor so
+    // that wizard-built sheets stay in sync with Foundry across restarts.
+    const updatePatch = {};
+    if (system && typeof system === "object" && Object.keys(system).length > 0) {
+      Object.assign(updatePatch, expandDotted(system));
+    }
+    if (img) updatePatch.img = img;
+    if (Object.keys(updatePatch).length > 0) {
+      try {
+        await existing.update(updatePatch);
+      } catch (err) {
+        console.warn("AI DM Bridge: failed to sync existing actor", name, err);
+      }
+    }
     return existing;
   }
 
-  const actor = await Actor.create({
+  const createData = {
     name,
     type: actorType,
-  });
+  };
+  if (img) createData.img = img;
+  if (system && typeof system === "object" && Object.keys(system).length > 0) {
+    Object.assign(createData, expandDotted(system));
+  }
+
+  const actor = await Actor.create(createData);
 
   if (!actor) {
     throw new Error(`Failed to create actor: ${name}`);

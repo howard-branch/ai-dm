@@ -109,7 +109,10 @@ class AudioQueue:
     def _loop(self) -> None:
         while not self._stop.is_set():
             try:
-                _prio, _tie, item = self._queue.get(timeout=0.1)
+                # Short timeout keeps shutdown responsive while still
+                # picking up newly enqueued items within ~10ms — important
+                # for time-to-first-sound after the narrator emits.
+                _prio, _tie, item = self._queue.get(timeout=0.01)
             except Empty:
                 continue
             self._processing = True

@@ -41,17 +41,11 @@ class Director:
         context = self._build_context(player_input, focus_npcs=focus_npcs, scene_id=scene_id)
         result = self.narrator.narrate(player_input=player_input, context=context)
 
-        self.state_store.apply_state_updates(result.state_updates)
-        outcome = self.command_router.dispatch(result.commands)
-
-        self._record_dialogue(result.dialogue)
-
-        if outcome.rollback_errors:
-            result.metadata["rollback_errors"] = list(outcome.rollback_errors)
-        result.metadata["commands_ok"] = outcome.ok
-
-        # Phase 3: emit a narrator.output_ready event so the audio
-        # dispatcher (and any other listener) can react.
+        # Phase 3: emit narrator.output_ready as early as possible so the
+        # audio dispatcher can begin synthesising the first sentence
+        # while we run the (often slower) state-update / Foundry-command
+        # / NPC-memory bookkeeping below. This shaves hundreds of ms off
+        # the time-to-first-sound after the LLM responds.
         if self.event_bus is not None:
             try:
                 self.event_bus.publish(
@@ -65,6 +59,15 @@ class Director:
                 )
             except Exception:  # noqa: BLE001
                 pass
+
+        self.state_store.apply_state_updates(result.state_updates)
+        outcome = self.command_router.dispatch(result.commands)
+
+        self._record_dialogue(result.dialogue)
+
+        if outcome.rollback_errors:
+            result.metadata["rollback_errors"] = list(outcome.rollback_errors)
+        result.metadata["commands_ok"] = outcome.ok
 
         return result
 

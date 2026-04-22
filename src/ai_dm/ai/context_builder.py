@@ -21,6 +21,7 @@ class PromptContextBuilder:
         location_service: LocationService | None = None,
         story_planner=None,
         character: dict | None = None,
+        party: list[dict] | None = None,
     ) -> None:
         self.state_store = state_store
         self.npc_memory = npc_memory
@@ -30,6 +31,10 @@ class PromptContextBuilder:
         # Active player character sheet. The narrator uses this to know
         # who is acting / speaking. Update at runtime to swap PCs.
         self.character = character
+        # Companion party members (AI-controlled or otherwise). Each entry
+        # is a compact dict {id, name, class, level, hp, role, controller}
+        # — enough for the narrator to answer "who is in my party".
+        self.party: list[dict] = list(party or [])
 
     def build(
         self,
@@ -41,6 +46,8 @@ class PromptContextBuilder:
         context: dict = {}
         if self.character:
             context["player_character"] = self.character
+        if self.party:
+            context["party"] = self.party
         if self.state_store is not None:
             try:
                 context["state"] = self.state_store.get_context()

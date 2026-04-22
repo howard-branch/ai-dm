@@ -15,6 +15,12 @@ def _parse_args() -> argparse.Namespace:
         help="Force the guided character-creation wizard at startup, "
              "even if a sheet already exists for the active campaign's PC.",
     )
+    p.add_argument(
+        "--voice",
+        action="store_true",
+        help="Start in hands-free voice mode (record on silence, transcribe, send). "
+             "Say 'stop listening' or press Ctrl-C to return to text input.",
+    )
     return p.parse_args()
 
 
@@ -25,6 +31,8 @@ def main() -> None:
     # Load .env (if present) before anything reads OPENAI_API_KEY etc.
     load_dotenv()
     runtime = build_runtime()
+    if args.voice:
+        runtime._voice_on_start = True  # noqa: SLF001 — public-enough toggle
     runtime.start()
 
 

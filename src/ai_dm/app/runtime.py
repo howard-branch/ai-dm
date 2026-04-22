@@ -10,7 +10,8 @@ from __future__ import annotations
 
 import json
 import logging
-from pathlib import Path
+import re
+import threading
 
 logger = logging.getLogger("ai_dm.app.runtime")
 
@@ -27,16 +28,51 @@ _HELP = (
     "                  the campaign pack's characters/ directory).\n"
     "  :mute           Disable voice narration for this session.\n"
     "  :unmute         Re-enable voice narration.\n"
+    "  :voice          Hands-free mode: speak naturally; recording\n"
+    "                  auto-stops on silence and the transcript is\n"
+    "                  sent to the DM. Press Ctrl-C or say one of the\n"
+    "                  stop-phrases to return to text input.\n"
+    "  :listen [secs]  Push-to-talk: records from the mic, then sends\n"
+    "                  the transcript as your input. With no argument,\n"
+    "                  records until you press Enter again.\n"
+    "  :mic            Show speech-input diagnostics (mic + STT backend).\n"
     "  :help           Show this help.\n"
     "  :quit / :exit   Exit the loop.\n"
 )
 
+# Spoken phrases that drop the user back to the keyboard from hands-free
+# voice mode. Matched case-insensitively against the *normalised*
+# transcript (punctuation stripped, collapsed whitespace).
+_VOICE_EXIT_PHRASES = (
+    "stop listening",
+    "stop voice",
+    "end voice",
+    "exit voice",
+    "exit voice mode",
+    "leave voice mode",
+    "quit voice",
+    "voice off",
+)
+# Spoken phrases that quit the runtime entirely.
+_VOICE_QUIT_PHRASES = (
+    "quit game",
+    "exit game",
+    "end session",
+    "shut down",
+    "shutdown",
+)
+
+
+def _normalise(text: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"[^\w\s]", "", text or "")).strip().lower()
+
 
 class Runtime:
-    def __init__(self, director, container=None) -> None:
+    def __init__(self, director, container=None, *, voice_on_start: bool = False) -> None:
         self.director = director
         self.container = container
         self._scene_id: str | None = None
+        self._voice_on_start = voice_on_start
 
     # ------------------------------------------------------------------ #
 
@@ -44,6 +80,10 @@ class Runtime:
         print(_BANNER)
         self._announce_character()
         try:
+            if self._voice_on_start:
+                # Drop straight into hands-free mode. When the user
+                # exits voice mode we fall through to the text loop.
+                self._voice_loop()
             self._loop()
         finally:
             self.shutdown()
@@ -107,6 +147,39 @@ class Runtime:
             else:
                 queue.interrupt()
                 print("[voice narration: off]")
+            return False
+
+        if cmd == ":mic":
+            speech = getattr(self.container, "speech_input", None) if self.container else None
+            if speech is None:
+                print("[speech input not configured]")
+                return False
+            status = speech.status()
+            print(
+                "[mic={mic_tool} ({mic_ok}) | stt={stt} ({stt_ok})]".format(
+                    mic_tool=status["mic_tool"] or "—",
+                    mic_ok="ok" if status["mic_available"] else "missing",
+                    stt=status["transcribe_backend"],
+                    stt_ok="ok" if status["transcribe_available"] else "missing",
+                )
+            )
+            return False
+
+        if cmd == ":voice":
+            self._voice_loop()
+            return False
+
+        if cmd == ":listen":
+            secs: float | None = None
+            if arg:
+                try:
+                    secs = float(arg)
+                except ValueError:
+                    print(f"[bad duration: {arg!r}]")
+                    return False
+            text = self._push_to_talk(seconds=secs)
+            if text:
+                self._handle_prompt(text)
             return False
 
         print(f"[unknown command {cmd!r}; try :help]")
@@ -195,6 +268,133 @@ class Runtime:
             self._announce_character()
             return
         print(f"[no character file found for {char_id!r} in {pack.state.characters} or {pack.paths.characters_seed}]")
+
+    # ------------------------------------------------------------------ #
+    # Voice input
+    # ------------------------------------------------------------------ #
+
+    def _push_to_talk(self, *, seconds: float | None = None) -> str:
+        speech = getattr(self.container, "speech_input", None) if self.container else None
+        if speech is None:
+            print("[speech input not configured]")
+            return ""
+        if not speech.recorder.is_available():
+            print("[no microphone tool found — install ffmpeg, arecord or parec]")
+            return ""
+        if not speech.transcriber.is_available():
+            print("[no speech-to-text backend — set OPENAI_API_KEY or install faster-whisper]")
+            return ""
+
+        if seconds is not None:
+            print(f"[recording {seconds:.1f}s …]")
+            text = speech.listen_for(seconds)
+        else:
+            print("[recording … press Enter to stop]")
+            stop = speech.begin()
+            try:
+                input()
+            except (EOFError, KeyboardInterrupt):
+                print()
+            print("[transcribing …]")
+            text = stop()
+
+        text = (text or "").strip()
+        if not text:
+            print("[no speech detected]")
+            return ""
+        print(f"[heard] {text}")
+        return text
+
+    # ------------------------------------------------------------------ #
+    # Hands-free voice loop
+    # ------------------------------------------------------------------ #
+
+    def _voice_loop(self) -> None:
+        """Continuously: wait for TTS to finish, listen, transcribe, send.
+
+        No keyboard input is required. The user leaves voice mode by:
+
+        * speaking one of :data:`_VOICE_EXIT_PHRASES` (e.g. "stop
+          listening") — drops back to the text REPL;
+        * speaking a :data:`_VOICE_QUIT_PHRASES` phrase — exits the
+          program (handled by the caller via the returned bool from
+          ``_handle_meta``-style flow);
+        * pressing Ctrl-C — drops back to the text REPL;
+        * an EOF on stdin (rare in interactive use).
+        """
+        speech = getattr(self.container, "speech_input", None) if self.container else None
+        if speech is None:
+            print("[speech input not configured]")
+            return
+        if not speech.recorder.is_available():
+            print("[no microphone tool found — install ffmpeg, arecord or parec]")
+            return
+        if not speech.transcriber.is_available():
+            print("[no speech-to-text backend — set OPENAI_API_KEY or install faster-whisper]")
+            return
+
+        audio_queue = getattr(self.container, "audio_queue", None)
+
+        print(
+            "\n[voice mode] speak naturally — recording auto-stops on silence.\n"
+            "  Say 'stop listening' (or press Ctrl-C) to return to text input.\n"
+            "  Say 'quit game' to exit the program.\n"
+        )
+
+        # Ctrl-C inside this loop should drop us back to the text REPL,
+        # not kill the process. We use a cancel event so the in-flight
+        # ffmpeg recording can be torn down promptly.
+        cancel = threading.Event()
+
+        try:
+            while True:
+                # 1. Wait for any DM speech to finish so we don't
+                #    immediately re-transcribe our own narration.
+                if audio_queue is not None:
+                    try:
+                        audio_queue.join(timeout=60.0)
+                    except Exception:  # noqa: BLE001
+                        pass
+
+                # 2. Open the mic.
+                cancel.clear()
+                print("[listening …]", flush=True)
+
+                def _on_speech() -> None:
+                    print("[heard you, recording …]", flush=True)
+
+                try:
+                    text = speech.listen_vad(
+                        cancel=cancel, on_speech_start=_on_speech
+                    )
+                except KeyboardInterrupt:
+                    print("\n[voice mode off]")
+                    return
+
+                text = (text or "").strip()
+                if not text:
+                    # Silence / nothing detected — quietly try again.
+                    continue
+
+                print(f"[heard] {text}")
+
+                # 3. Honour spoken control phrases.
+                norm = _normalise(text)
+                if any(p in norm for p in _VOICE_EXIT_PHRASES):
+                    print("[voice mode off]")
+                    return
+                if any(p in norm for p in _VOICE_QUIT_PHRASES):
+                    print("[goodbye]")
+                    raise SystemExit(0)
+
+                # 4. Hand the transcript to the director just like any
+                #    typed prompt. The narration_dispatcher will start
+                #    speaking; the next loop iteration's join() will
+                #    wait for it before re-opening the mic.
+                self._handle_prompt(text)
+        except KeyboardInterrupt:
+            cancel.set()
+            print("\n[voice mode off]")
 
     # ------------------------------------------------------------------ #
 
