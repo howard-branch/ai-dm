@@ -1,0 +1,64 @@
+.ai-dm-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+    font-family: var(--font-primary, sans-serif);
+}
+
+.ai-dm-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+}
+
+.ai-dm-panel-header h2 {
+    margin: 0;
+    font-size: 1.1em;
+}
+
+.ai-dm-actor {
+    color: var(--color-text-dark-secondary, #444);
+    font-size: 0.9em;
+}
+
+.ai-dm-form {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.ai-dm-form textarea {
+    width: 100%;
+    resize: vertical;
+    min-height: 70px;
+}
+
+.ai-dm-actions-row {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.ai-dm-quick-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+}
+
+.ai-dm-quick-row button {
+    font-size: 0.85em;
+}
+
+.ai-dm-narration {
+    color: #2a2a2a;
+}
+
+.ai-dm-dialogue {
+    color: #333;
+    font-style: italic;
+}
+
+.ai-dm-error {
+    color: #a33;
+}
+

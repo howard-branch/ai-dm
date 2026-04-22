@@ -59,6 +59,11 @@ class FoundryClient:
         self._receiver_thread: threading.Thread | None = None
         self._connected = False
         self.stats = ClientStats()
+        # Push-event callback. Set by ``SocketBridge.connect()`` to
+        # republish Foundry-originated ``{"type":"event"}`` envelopes
+        # onto the in-process ``EventBus``. Default ``None`` means the
+        # client silently drops inbound events.
+        self.on_push = None  # type: ignore[assignment]
 
     # ------------------------------------------------------------------ #
     # Public API
@@ -108,6 +113,30 @@ class FoundryClient:
             timeout=timeout,
             correlation_id=correlation_id,
         )
+
+    def send_event(
+        self,
+        name: str,
+        payload: dict[str, Any] | None = None,
+        *,
+        event_id: str | None = None,
+    ) -> str:
+        """Push an out-of-band ``{"type":"event"}`` envelope to Foundry.
+
+        Used for Python→Foundry signals that aren't request/response
+        commands (e.g. ``narration`` chat messages produced by the
+        ``PlayerInputDispatcher``).
+        """
+        import uuid
+
+        envelope: dict[str, Any] = {
+            "type": "event",
+            "event": name,
+            "payload": payload or {},
+            "event_id": event_id or f"evt-{uuid.uuid4().hex}",
+        }
+        self._send_envelope(envelope)
+        return envelope["event_id"]
 
     # ------------------------------------------------------------------ #
     # Internals

@@ -1,0 +1,14 @@
+{
+  "type": "event",
+  "event": "player_intent",
+  "event_id": "evt-attack-001",
+  "payload": {
+    "type": "attack",
+    "actor_id": "actor-pc-1",
+    "target_id": "actor-goblin-3",
+    "weapon": "longsword",
+    "scene_id": "scene-sanctum",
+    "user_id": "user-xyz"
+  }
+}
+

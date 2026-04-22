@@ -1,0 +1,14 @@
+{
+  "type": "event",
+  "event": "player_input",
+  "event_id": "evt-abc123",
+  "payload": {
+    "user_id": "user-xyz",
+    "user_name": "Alice",
+    "actor_id": "actor-pc-1",
+    "actor_name": "Morgana",
+    "scene_id": "scene-sanctum",
+    "text": "I push the door open and step inside, raising my torch."
+  }
+}
+

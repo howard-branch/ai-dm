@@ -1,0 +1,16 @@
+{
+  "type": "event",
+  "event": "narration",
+  "event_id": "evt-def456",
+  "payload": {
+    "actor_id": "actor-pc-1",
+    "user_id": "user-xyz",
+    "narration": "The door groans open. Dust hangs in the torchlight.",
+    "dialogue": [
+      {"npc_id": "ghostly_voice", "text": "Who dares?", "tone": "menacing"}
+    ],
+    "commands_ok": true,
+    "whisper_to": null
+  }
+}
+

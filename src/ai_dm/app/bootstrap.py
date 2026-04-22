@@ -97,6 +97,11 @@ def build_runtime(settings: Settings | None = None) -> Runtime:
         npc_memory=container.npc_memory,
         event_bus=container.event_bus,  # publishes narrator.output_ready
     )
+    # Wire the chat-driven dispatcher to the freshly built Director so
+    # ``/act <text>`` from Foundry chat runs the same turn pipeline as
+    # the local REPL.
+    if container.player_input_dispatcher is not None:
+        container.player_input_dispatcher.wire(director)
     _apply_hardcoded_start(pack, container)
     return Runtime(director=director, container=container)
 

@@ -7,6 +7,65 @@ console.log("AI DM Bridge file loaded - top of module");
 let relaySocket = null;
 let reconnectTimer = null;
 
+// Buffered outbound events while the relay is (re)connecting.
+const pendingEvents = [];
+// Bounded LRU of inbound event_ids so a relay replay does not render
+// the same narration twice.
+const seenEventIds = new Map();
+const SEEN_EVENT_LIMIT = 256;
+
+function rememberEventId(id) {
+  if (!id) return;
+  if (seenEventIds.has(id)) return;
+  seenEventIds.set(id, true);
+  while (seenEventIds.size > SEEN_EVENT_LIMIT) {
+    const oldest = seenEventIds.keys().next().value;
+    seenEventIds.delete(oldest);
+  }
+}
+
+/**
+ * Send an out-of-band {type:"event"} envelope to Python via the relay.
+ * Used by chat_commands.js (`/act`), dm_panel.js, and combat_macros.js.
+ */
+export function sendEventToPython(eventName, payload) {
+  const envelope = {
+    type: "event",
+    event: eventName,
+    payload: payload || {},
+    event_id: `evt-${foundry.utils.randomID(16)}`,
+  };
+  if (!relaySocket || relaySocket.readyState !== WebSocket.OPEN) {
+    pendingEvents.push(envelope);
+    console.warn("AI DM Bridge: relay not open, buffering event", eventName);
+    return envelope.event_id;
+  }
+  relaySocket.send(JSON.stringify(envelope));
+  return envelope.event_id;
+}
+
+export function sendPlayerInput(payload) {
+  return sendEventToPython("player_input", payload);
+}
+
+export function sendStructuredIntent(payload) {
+  return sendEventToPython("player_intent", payload);
+}
+
+function flushPendingEvents() {
+  while (pendingEvents.length && relaySocket && relaySocket.readyState === WebSocket.OPEN) {
+    const env = pendingEvents.shift();
+    relaySocket.send(JSON.stringify(env));
+  }
+}
+
+// Inbound event dispatch (Python → Foundry).
+const inboundEventHandlers = new Map();
+
+export function registerInboundEvent(name, handler) {
+  inboundEventHandlers.set(name, handler);
+}
+
 // Bounded LRU of recently-processed request ids so that a relay replay does
 // not run the same command twice. Cached responses are re-emitted on replay.
 const PROCESSED_LRU_LIMIT = 512;
@@ -150,6 +209,7 @@ function connectRelay() {
       type: "hello",
       client: "foundry",
     }));
+    flushPendingEvents();
   });
 
   relaySocket.addEventListener("message", async (event) => {
@@ -195,6 +255,25 @@ function connectRelay() {
       return;
     }
 
+    if (msg.type === "event") {
+      const eventId = msg.event_id;
+      if (eventId && seenEventIds.has(eventId)) {
+        return;
+      }
+      rememberEventId(eventId);
+      const handler = inboundEventHandlers.get(msg.event);
+      if (handler) {
+        try {
+          await handler(msg.payload || {});
+        } catch (err) {
+          console.warn("AI DM Bridge inbound event handler failed", msg.event, err);
+        }
+      } else {
+        console.warn("AI DM Bridge: no handler for inbound event", msg.event);
+      }
+      return;
+    }
+
     console.warn("AI DM Bridge unhandled relay message", msg);
   });
 
@@ -235,8 +314,18 @@ Hooks.once("ready", async () => {
     async handleBatch(commands) {
       return handleBatch(commands);
     },
+    sendPlayerInput,
+    sendStructuredIntent,
+    registerInboundEvent,
   };
   console.log("AI DM Bridge assigning global - done");
+
+  // Default inbound: render a narration envelope as a chat message.
+  registerInboundEvent("narration", async (payload) => {
+    const { renderNarration } = await import("./narration_renderer.js");
+    return renderNarration(payload);
+  });
+
   installInboundHooks();
   connectRelay();
 });

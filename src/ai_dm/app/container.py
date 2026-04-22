@@ -43,8 +43,11 @@ from ai_dm.game.timeline import Timeline
 from ai_dm.game.trigger_loader import load_triggers
 from ai_dm.memory.npc_memory import NPCMemoryStore
 from ai_dm.memory.relationships import RelationshipMatrix
+from ai_dm.orchestration.actor_session import ActorSessionRegistry
 from ai_dm.orchestration.command_router import CommandRouter
 from ai_dm.orchestration.event_bus import EventBus
+from ai_dm.orchestration.player_input_dispatcher import PlayerInputDispatcher
+from ai_dm.orchestration.structured_intent_dispatcher import StructuredIntentDispatcher
 from ai_dm.orchestration.triggers import TriggerEngine
 from ai_dm.orchestration.turn_manager import TurnManager
 from ai_dm.persistence.backups import BackupService
@@ -144,6 +147,9 @@ class Container:
     socket_bridge: Optional[SocketBridge] = None
     arbiter: Optional[InboundArbiter] = None
     echo_suppressor: Optional[EchoSuppressor] = None
+    actor_sessions: Optional[ActorSessionRegistry] = None
+    player_input_dispatcher: Optional[PlayerInputDispatcher] = None
+    structured_intent_dispatcher: Optional[StructuredIntentDispatcher] = None
     token_state: dict[str, Any] = field(default_factory=dict)
     scene_state: dict[str, Any] = field(default_factory=dict)
     flags: dict[str, Any] = field(default_factory=dict)
@@ -368,6 +374,25 @@ class Container:
         if cfg.auto_load and campaign_store.save_path.exists():
             campaign_store.restore_into_runtime()
 
+        # ---- Chat-driven multi-player input ---- #
+        actor_sessions = ActorSessionRegistry(pack=pack)
+        player_input_dispatcher = PlayerInputDispatcher(
+            event_bus=event_bus,
+            sessions=actor_sessions,
+            client=client,
+            prompt_context=prompt_context,
+            director=None,  # wired in bootstrap.build_runtime after Director exists
+        )
+        structured_intent_dispatcher = StructuredIntentDispatcher(
+            event_bus=event_bus,
+            intent_router=intent_router,
+            combat=combat,
+            client=client,
+        )
+        if cfg.inbound_foundry_enabled:
+            player_input_dispatcher.start()
+            structured_intent_dispatcher.start()
+
         return cls(
             config=cfg,
             pack=pack,
@@ -406,6 +431,9 @@ class Container:
             socket_bridge=socket_bridge,
             arbiter=arbiter,
             echo_suppressor=echo_suppressor,
+            actor_sessions=actor_sessions,
+            player_input_dispatcher=player_input_dispatcher,
+            structured_intent_dispatcher=structured_intent_dispatcher,
             flags=flags,
             actor_state=actor_state,
             token_state=token_state,
@@ -442,6 +470,16 @@ class Container:
         if self.arbiter is not None:
             try:
                 self.arbiter.stop()
+            except Exception:  # noqa: BLE001
+                pass
+        if self.player_input_dispatcher is not None:
+            try:
+                self.player_input_dispatcher.stop()
+            except Exception:  # noqa: BLE001
+                pass
+        if self.structured_intent_dispatcher is not None:
+            try:
+                self.structured_intent_dispatcher.stop()
             except Exception:  # noqa: BLE001
                 pass
         if self.queue is not None:

@@ -1,0 +1,14 @@
+{
+  "type": "event",
+  "event": "player_intent",
+  "event_id": "evt-skill-001",
+  "payload": {
+    "type": "skill_check",
+    "actor_id": "actor-pc-1",
+    "skill": "perception",
+    "dc": 12,
+    "scene_id": "scene-sanctum",
+    "user_id": "user-xyz"
+  }
+}
+

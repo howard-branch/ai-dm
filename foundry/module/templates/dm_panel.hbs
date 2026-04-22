@@ -1,0 +1,20 @@
+<section class="ai-dm-panel">
+    <header class="ai-dm-panel-header">
+        <h2>AI DM</h2>
+        <div class="ai-dm-actor">{{actorName}}</div>
+    </header>
+
+    <form class="ai-dm-form">
+        <textarea name="text" rows="4" placeholder="What does {{actorName}} do or say?"></textarea>
+        <div class="ai-dm-actions-row">
+            <button type="submit" class="ai-dm-submit" data-action="submit">Send</button>
+        </div>
+        <div class="ai-dm-quick-row">
+            <button type="button" data-action="talk">Talk</button>
+            <button type="button" data-action="inspect">Inspect</button>
+            <button type="button" data-action="move">Move</button>
+            <button type="button" data-action="end_turn">End Turn</button>
+        </div>
+    </form>
+</section>
+

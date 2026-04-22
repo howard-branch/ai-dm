@@ -1,0 +1,12 @@
+{
+  "type": "event",
+  "event": "player_intent",
+  "event_id": "evt-end-001",
+  "payload": {
+    "type": "end_turn",
+    "actor_id": "actor-pc-1",
+    "scene_id": "scene-sanctum",
+    "user_id": "user-xyz"
+  }
+}
+

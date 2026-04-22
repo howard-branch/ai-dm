@@ -34,6 +34,7 @@ class FoundryRelayServer:
         # Per-direction dedupe of forwarded request ids.
         self._seen_outbound: OrderedDict[str, None] = OrderedDict()
         self._seen_results: OrderedDict[str, None] = OrderedDict()
+        self._seen_events: OrderedDict[str, None] = OrderedDict()
         self._lru_size = seen_id_lru_size
 
     async def run(self) -> None:
@@ -157,6 +158,29 @@ class FoundryRelayServer:
                 return
 
             await self._broadcast_to_python(msg)
+            return
+
+        if msg_type == "event":
+            # Bidirectional, fire-and-forget channel for chat-driven
+            # input (`player_input`, `player_intent`) and outbound
+            # `narration` pushes. Deduped by an optional `event_id`.
+            import uuid as _uuid
+
+            event_id = msg.get("event_id") or f"evt-{_uuid.uuid4().hex}"
+            if self._mark_seen(self._seen_events, event_id):
+                logger.warning("dropping duplicate event id=%s", event_id)
+                return
+
+            forward = {
+                "type": "event",
+                "event": msg.get("event"),
+                "payload": msg.get("payload") or {},
+                "event_id": event_id,
+            }
+            if client_type == "foundry":
+                await self._broadcast_to_python(forward)
+            else:
+                await self._broadcast_to_foundry(forward)
             return
 
         await websocket.send(json.dumps({
