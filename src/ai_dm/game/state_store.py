@@ -28,8 +28,14 @@ class StateStore:
 
     def _load_json(self, filename: str) -> dict:
         path = self.base / filename
-        return json.loads(path.read_text(encoding="utf-8"))
+        if not path.exists():
+            return {}
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return {}
 
     def _save_json(self, filename: str, payload: dict) -> None:
         path = self.base / filename
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(payload, indent=2), encoding="utf-8")

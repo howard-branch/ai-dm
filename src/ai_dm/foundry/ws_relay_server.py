@@ -43,6 +43,7 @@ class FoundryRelayServer:
 
     async def _handler(self, websocket: ServerConnection) -> None:
         client_type = None
+        peer = getattr(websocket, "remote_address", None)
         try:
             raw = await websocket.recv()
             msg = json.loads(raw)
@@ -66,6 +67,12 @@ class FoundryRelayServer:
                 }))
                 return
 
+            logger.info(
+                "client connected: type=%s peer=%s (python=%d foundry=%d)",
+                client_type, peer,
+                len(self.state.python_clients), len(self.state.foundry_clients),
+            )
+
             await websocket.send(json.dumps({
                 "type": "hello_ack",
                 "client": client_type,
@@ -75,12 +82,18 @@ class FoundryRelayServer:
                 await self._handle_message(websocket, client_type, raw)
 
         except Exception as exc:
-            logger.warning("relay connection error: %s", exc)
+            logger.warning("relay connection error (peer=%s): %s", peer, exc)
         finally:
             if client_type == "python":
                 self.state.python_clients.discard(websocket)
             elif client_type == "foundry":
                 self.state.foundry_clients.discard(websocket)
+            if client_type is not None:
+                logger.info(
+                    "client disconnected: type=%s peer=%s (python=%d foundry=%d)",
+                    client_type, peer,
+                    len(self.state.python_clients), len(self.state.foundry_clients),
+                )
 
     async def _handle_message(
             self,

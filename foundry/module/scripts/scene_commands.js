@@ -1,5 +1,11 @@
 export async function activateScene(sceneId) {
-  const scene = game.scenes?.get(sceneId);
+  // Accept either Foundry's internal scene id or a human-readable name.
+  // This lets campaign manifests use stable slugs (e.g. "candlekeep_courtyard")
+  // instead of opaque auto-generated ids that change per-world.
+  let scene = game.scenes?.get(sceneId);
+  if (!scene) {
+    scene = game.scenes?.find((s) => s.name === sceneId);
+  }
   if (!scene) {
     throw new Error(`Scene not found: ${sceneId}`);
   }

@@ -10,3 +10,11 @@ overrides: {}
 entrypoints:
   first_chapter: chapter_01
 
+# Hardcoded starting point for the Morgana pack. The bootstrap reads
+# this and (1) activates the scene, (2) ensures the player character
+# exists, and (3) spawns its token. Intentionally pack-specific — no
+# generalisation yet.
+start:
+  scene: candlekeep_courtyard
+  player_character: morgana
+

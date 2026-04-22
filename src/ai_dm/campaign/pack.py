@@ -79,6 +79,7 @@ class CampaignManifest:
     version: str = "0.0.0"
     entrypoints: dict[str, Any] = field(default_factory=dict)
     overrides: dict[str, str] = field(default_factory=dict)
+    start: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def load(cls, path: Path) -> "CampaignManifest":
@@ -104,6 +105,7 @@ class CampaignManifest:
             version=str(data.get("version") or "0.0.0"),
             entrypoints=dict(data.get("entrypoints") or {}),
             overrides=dict(data.get("overrides") or {}),
+            start=dict(data.get("start") or {}),
         )
 
     @classmethod

@@ -17,6 +17,7 @@ from ai_dm.ai.narrator import Narrator
 from ai_dm.ai.planner import StoryPlanner
 from ai_dm.audio.audio_queue import AudioQueue
 from ai_dm.audio.narration_dispatcher import NarrationDispatcher
+from ai_dm.audio.playback import play_bytes
 from ai_dm.audio.tts import NullBackend, TTSBackend, default_backend
 from ai_dm.audio.voices import VoiceProfile
 from ai_dm.campaign.pack import CampaignPack, seed_characters
@@ -243,7 +244,11 @@ class Container:
             pack.paths.voices,
             default_voice=cfg.edge_voice,
         )
-        audio_queue = AudioQueue(tts, autostart=cfg.audio_enabled)
+        audio_queue = AudioQueue(
+            tts,
+            sink=lambda _item, audio: play_bytes(audio),
+            autostart=cfg.audio_enabled,
+        )
         narration_dispatcher = NarrationDispatcher(
             event_bus=event_bus,
             queue=audio_queue,

@@ -216,6 +216,14 @@ function scheduleReconnect() {
   }, 3000);
 }
 
+// Placeholder: future home of inbound Foundry → Python hooks (e.g. forward
+// updateToken / updateActor / canvasReady events back across the relay so
+// the Python side can react to GM-driven changes). Defined as a no-op so
+// the module loads cleanly until the inbound channel is implemented.
+function installInboundHooks() {
+  // intentionally empty
+}
+
 Hooks.once("ready", async () => {
   console.log("AI DM Bridge ready");
   console.log("AI DM Bridge assigning global");

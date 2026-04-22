@@ -1,3 +1,14 @@
+// Resolve a scene by Foundry id OR by name, so campaign manifests can use
+// stable human slugs instead of opaque auto-generated ids.
+function resolveScene(sceneIdOrName) {
+  if (!sceneIdOrName) return game.scenes?.current ?? null;
+  return (
+    game.scenes?.get(sceneIdOrName) ??
+    game.scenes?.find((s) => s.name === sceneIdOrName) ??
+    null
+  );
+}
+
 export async function moveToken(tokenId, x, y) {
   const scene = game.scenes?.current;
   if (!scene) {
@@ -24,12 +35,12 @@ export async function moveToken(tokenId, x, y) {
 }
 
 export async function spawnToken(sceneId, actorId, x, y, name = null) {
-  const scene = game.scenes?.get(sceneId);
+  const scene = resolveScene(sceneId);
   if (!scene) {
     throw new Error(`Scene not found: ${sceneId}`);
   }
 
-  const actor = game.actors?.get(actorId);
+  const actor = game.actors?.get(actorId) ?? game.actors?.find((a) => a.name === actorId);
   if (!actor) {
     throw new Error(`Actor not found: ${actorId}`);
   }
@@ -52,7 +63,7 @@ export async function spawnToken(sceneId, actorId, x, y, name = null) {
 }
 
 export async function deleteToken(sceneId, tokenId) {
-  const scene = sceneId ? game.scenes?.get(sceneId) : game.scenes?.current;
+  const scene = resolveScene(sceneId);
   if (!scene) {
     throw new Error(`Scene not found: ${sceneId ?? "<current>"}`);
   }
@@ -70,7 +81,7 @@ export async function deleteToken(sceneId, tokenId) {
 }
 
 export async function readToken(sceneId, tokenId) {
-  const scene = sceneId ? game.scenes?.get(sceneId) : game.scenes?.current;
+  const scene = resolveScene(sceneId);
   if (!scene) {
     throw new Error(`Scene not found: ${sceneId ?? "<current>"}`);
   }
