@@ -19,9 +19,14 @@ logger = logging.getLogger("ai_dm.app.settings")
 DEFAULT_SETTINGS_PATH = Path("config/settings.yaml")
 
 
+def _expand_path(value: str | Path | None, default: str) -> Path:
+    raw = value or default
+    return Path(raw).expanduser()
+
+
 @dataclass(frozen=True)
 class CampaignsSettings:
-    root: Path = Path("campaigns")
+    root: Path = Path("~/dnd/campaigns").expanduser()
     active: str | None = None
     state_root: Path = Path("data/campaigns")
 
@@ -47,9 +52,9 @@ class Settings:
         return cls(
             raw=data,
             campaigns=CampaignsSettings(
-                root=Path(c.get("root") or "campaigns"),
+                root=_expand_path(c.get("root"), "~/dnd/campaigns"),
                 active=(c.get("active") or None),
-                state_root=Path(c.get("state_root") or "data/campaigns"),
+                state_root=_expand_path(c.get("state_root"), "data/campaigns"),
             ),
         )
 

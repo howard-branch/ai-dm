@@ -5,8 +5,13 @@ __pycache__/
 .coverage
 .venv/
 .env
+
+# Runtime state and local caches.
 data/cache/
-data/saves/backups/
+data/memory/
+data/saves/
+data/campaigns/
+
 dist/
 build/
 *.egg-info/

@@ -43,10 +43,11 @@ persistence:
 # slug (looked up under `root`) or a path to a pack directory. All
 # per-campaign mutable state (live characters, saves, backups, memory)
 # is written under `<state_root>/<slug>/`, keeping the pack itself
-# read-only and distributable.
+# read-only and distributable. Pack content defaults to `~/dnd/campaigns`
+# so authored material stays outside this repository.
 campaigns:
-  root: campaigns
-  active: morgana
+  root: ~/dnd/campaigns
+  active: ArmyOfTheDamned
   state_root: data/campaigns
 
 memory:

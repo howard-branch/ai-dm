@@ -19,8 +19,9 @@ python -m ai_dm.main
 
 ## Project layout
 
-- `assets/` authored campaign content
+- `assets/` shared rules/reference assets
 - `data/` mutable runtime state and saves
+- `~/dnd/campaigns/` authored campaign packs (outside the repo by default)
 - `foundry/` Foundry module bridge
 - `src/ai_dm/` Python application code
 - `tests/` unit and integration tests
@@ -84,10 +85,10 @@ Per-event policy is configurable in `config/settings.yaml` under
 ## Pluggable campaigns
 
 Campaign-specific content lives in self-contained **campaign packs**
-under `campaigns/<slug>/`:
+under `~/dnd/campaigns/<slug>/` by default:
 
 ```
-campaigns/morgana/
+~/dnd/campaigns/morgana/
   campaign.yaml        # id, name, version, optional path overrides
   chapters/
   locations/
@@ -114,7 +115,7 @@ Switching campaigns is one line in `config/settings.yaml`:
 
 ```yaml
 campaigns:
-  root: campaigns
+  root: ~/dnd/campaigns
   active: morgana          # slug under root, OR a path to a pack
   state_root: data/campaigns
 ```

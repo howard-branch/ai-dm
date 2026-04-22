@@ -10,6 +10,11 @@ import logging
 import os
 from pathlib import Path
 
+from ai_dm.app.character_wizard import (
+    needs_wizard,
+    run_wizard,
+    write_sheet,
+)
 from ai_dm.app.container import Container, ContainerConfig
 from ai_dm.app.runtime import Runtime
 from ai_dm.app.settings import Settings
@@ -57,6 +62,7 @@ def _resolve_pack_from_settings(settings: Settings) -> CampaignPack:
 def build_runtime(settings: Settings | None = None) -> Runtime:
     settings = settings or Settings.load()
     pack = _resolve_pack_from_settings(settings)
+    _maybe_run_character_wizard(pack)
     audio_enabled = _env_bool("AI_DM_AUDIO", default=True)
     edge_voice = os.environ.get("TTS_VOICE") or "en-GB-SoniaNeural"
     container = Container.build(
@@ -83,6 +89,36 @@ def build_runtime(settings: Settings | None = None) -> Runtime:
     )
     _apply_hardcoded_start(pack, container)
     return Runtime(director=director, container=container)
+
+
+# --------------------------------------------------------------------- #
+# Character wizard gate
+# --------------------------------------------------------------------- #
+
+
+def _maybe_run_character_wizard(pack: CampaignPack) -> None:
+    """Run the guided character creator if the active pack has no PC sheet.
+
+    Forced on with ``AI_DM_NEW_CHARACTER=1``. Skipped if the manifest has
+    no ``start.player_character``, if a live sheet exists, or (when not
+    forced) if a seed sheet exists.
+    """
+    pc_id = (pack.manifest.start or {}).get("player_character")
+    if not pc_id:
+        return
+    forced = _env_bool("AI_DM_NEW_CHARACTER", default=False)
+    if not forced and not needs_wizard(pack, pc_id):
+        return
+    try:
+        sheet = run_wizard(pc_id)
+    except (EOFError, KeyboardInterrupt):
+        logger.warning("character wizard cancelled; continuing with existing state")
+        return
+    try:
+        path = write_sheet(pack, pc_id, sheet)
+        logger.info("character wizard wrote sheet: %s", path)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("character wizard write failed: %s", exc)
 
 
 # --------------------------------------------------------------------- #
@@ -130,14 +166,21 @@ def _apply_hardcoded_start(pack: CampaignPack, container: Container) -> None:
 
     # Skip create_actor if the registry already knows this PC; otherwise
     # attempt to create one. The BatchExecutor will register the result.
+    #
+    # When we create/discover the actor by display name, token spawning must
+    # use that same resolvable reference on the first startup pass. Some packs
+    # (including non-Morgana ones) use a stable character-sheet id that does
+    # not match the Foundry actor name.
+    spawn_actor_ref = pc_id
     if container.registry.get("actor", pc_id) is None:
         commands.append(CreateActorCommand(name=pc_name, actor_type="character"))
+        spawn_actor_ref = pc_name
 
     # Spawn at scene origin — anchor resolution can come later.
     commands.append(
         SpawnTokenCommand(
             scene_id=scene_id,
-            actor_id=pc_id,
+            actor_id=spawn_actor_ref,
             x=0,
             y=0,
             name=pc_name,

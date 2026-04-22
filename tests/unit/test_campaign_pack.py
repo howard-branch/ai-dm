@@ -6,7 +6,6 @@ from pathlib import Path
 import pytest
 
 from ai_dm.campaign.pack import (
-    CampaignManifest,
     CampaignPack,
     resolve_pack,
     seed_characters,
@@ -110,6 +109,18 @@ def test_resolve_pack_by_path(tmp_path: Path):
         state_root=tmp_path / "state",
     )
     assert pack.slug == "mine"
+
+
+def test_resolve_pack_expands_user_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    root = Path("~/dnd/campaigns").expanduser()
+    state_root = Path("~/dnd/state").expanduser()
+    _make_pack(root / "demo", slug="demo")
+
+    pack = resolve_pack("demo", campaigns_root=Path("~/dnd/campaigns"), state_root=Path("~/dnd/state"))
+
+    assert pack.root == root / "demo"
+    assert pack.state.root == state_root / "demo"
 
 
 def test_resolve_pack_missing(tmp_path: Path):

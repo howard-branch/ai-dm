@@ -2,7 +2,7 @@
 
 Layout of a campaign pack (read-only, distributable)::
 
-    campaigns/<slug>/
+    ~/dnd/campaigns/<slug>/
         campaign.yaml            # manifest (id, name, version, overrides)
         chapters/
         locations/
@@ -30,7 +30,7 @@ read-only::
 The active pack is selected via ``config/settings.yaml``::
 
     campaigns:
-      root: campaigns
+      root: ~/dnd/campaigns
       active: morgana          # slug under root, OR a path to a pack
       state_root: data/campaigns
 
@@ -47,6 +47,10 @@ from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger("ai_dm.campaign.pack")
+
+
+def _expand_path(value: str | Path) -> Path:
+    return Path(value).expanduser()
 
 
 # --------------------------------------------------------------------- #
@@ -210,10 +214,10 @@ class CampaignPack:
         state_root: Path,
         manifest_filename: str = "campaign.yaml",
     ) -> "CampaignPack":
-        root = Path(root)
+        root = _expand_path(root)
         manifest = CampaignManifest.load(root / manifest_filename)
         paths = CampaignPaths(root=root, overrides=manifest.overrides)
-        state = CampaignState(root=Path(state_root) / manifest.id)
+        state = CampaignState(root=_expand_path(state_root) / manifest.id)
         return cls(root=root, manifest=manifest, paths=paths, state=state)
 
     @classmethod
@@ -233,7 +237,7 @@ class CampaignPack:
         ``saves_dir`` unchanged. Live characters land in
         ``saves_dir.parent / "characters"`` by the same trick.
         """
-        root = Path(campaign_assets)
+        root = _expand_path(campaign_assets)
         manifest = CampaignManifest.synthetic(slug)
         seed = characters_seed
         if seed is None:
@@ -244,7 +248,7 @@ class CampaignPack:
         paths = CampaignPaths(root=root, overrides=legacy_overrides)
         # state.root is chosen so that state.saves == saves_dir exactly,
         # preserving the flat layout the legacy code expected.
-        state = CampaignState(root=Path(saves_dir).parent)
+        state = CampaignState(root=_expand_path(saves_dir).parent)
         return cls(root=root, manifest=manifest, paths=paths, state=state)
 
 
@@ -261,22 +265,23 @@ def resolve_pack(
 ) -> CampaignPack:
     """Resolve ``selector`` (slug or path) into a loaded :class:`CampaignPack`.
 
-    * If ``selector`` is an existing path (absolute or relative to CWD),
+    * If ``selector`` is an existing path (absolute, ``~``-expanded, or relative to CWD),
       it is treated as a pack root.
     * Otherwise it is looked up under ``campaigns_root / selector``.
     """
-    candidate = Path(selector)
+    candidate = _expand_path(selector)
+    campaigns_root = _expand_path(campaigns_root)
     if not candidate.is_absolute():
         # Try as a path first, then as a slug.
         if candidate.exists() and candidate.is_dir():
             root = candidate
         else:
-            root = Path(campaigns_root) / selector
+            root = campaigns_root / selector
     else:
         root = candidate
     if not root.exists():
         raise FileNotFoundError(f"campaign pack not found: {root}")
-    return CampaignPack.load(root, state_root=Path(state_root))
+    return CampaignPack.load(root, state_root=_expand_path(state_root))
 
 
 def seed_characters(pack: CampaignPack, *, overwrite: bool = False) -> list[Path]:
