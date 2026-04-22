@@ -1,6 +1,130 @@
 {
   "id": "morgana",
   "name": "Morgana",
-  "class": "Witch Necromancer",
-  "notes": "Starter character file."
+  "pronouns": "she/her",
+  "race": "Half-Elf",
+  "class": "Witch (Necromancer)",
+  "subclass": "Pact of the Bone",
+  "level": 3,
+  "background": "Exile",
+  "alignment": "neutral",
+  "voice": "en-GB-SoniaNeural",
+  "portrait": "portraits/morgana.png",
+  "appearance": "Tall, ash-blonde, hollow-cheeked. Black travel cloak, silver thorn at the throat. Ink-stained fingertips.",
+  "personality": "Quiet, precise, a little tired. Treats the dead as colleagues, the living as variables.",
+  "ideals": [
+    "Knowledge is owed to the dead, not extracted from them."
+  ],
+  "bonds": [
+    "The unnamed grave that started her exile."
+  ],
+  "flaws": [
+    "Will spend her last spell slot on a corpse before a friend."
+  ],
+  "abilities": {
+    "str": 8,
+    "dex": 14,
+    "con": 14,
+    "int": 13,
+    "wis": 12,
+    "cha": 17
+  },
+  "saves": {
+    "wis": 3,
+    "cha": 5
+  },
+  "skills": {
+    "arcana": 3,
+    "history": 3,
+    "insight": 3,
+    "persuasion": 5,
+    "religion": 3
+  },
+  "ac": 13,
+  "hp": {
+    "current": 24,
+    "max": 24,
+    "temp": 0
+  },
+  "speed": 30,
+  "proficiency_bonus": 2,
+  "senses": {
+    "darkvision": 60,
+    "passive_perception": 11
+  },
+  "languages": [
+    "Common",
+    "Elvish",
+    "Infernal"
+  ],
+  "spellcasting": {
+    "ability": "cha",
+    "save_dc": 13,
+    "attack_bonus": 5,
+    "slots": {
+      "1": 4,
+      "2": 2
+    },
+    "cantrips": [
+      "chill touch",
+      "minor illusion",
+      "eldritch blast",
+      "mage hand"
+    ],
+    "spells_known": [
+      "cause fear",
+      "false life",
+      "hex",
+      "unseen servant",
+      "invisibility",
+      "ray of enfeeblement"
+    ]
+  },
+  "features": [
+    {
+      "name": "Pact of the Bone",
+      "summary": "May bind a single skeletal familiar (Grim, the raven-skull) and channel cantrips through it."
+    },
+    {
+      "name": "Eldritch Invocations",
+      "list": [
+        "Agonizing Blast",
+        "Devil's Sight"
+      ]
+    }
+  ],
+  "inventory": [
+    {
+      "id": "item.dagger",
+      "name": "Silver Dagger",
+      "qty": 1,
+      "equipped": true
+    },
+    {
+      "id": "item.focus_thorn",
+      "name": "Silver Thorn (arcane focus)",
+      "qty": 1,
+      "equipped": true
+    },
+    {
+      "id": "item.gift_tome",
+      "name": "The Gift Tome (sealed)",
+      "qty": 1,
+      "tags": [
+        "quest"
+      ]
+    },
+    {
+      "id": "item.component_pouch",
+      "name": "Component Pouch",
+      "qty": 1
+    },
+    {
+      "id": "item.gold",
+      "name": "gp",
+      "qty": 17
+    }
+  ],
+  "conditions": [],
+  "notes": "Exiled from the academy at Velmis for un-naming a dead king. Carries the sealed tome as her Gift of Knowledge for Candlekeep."
 }

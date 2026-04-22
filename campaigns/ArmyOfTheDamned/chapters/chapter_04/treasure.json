@@ -1,0 +1,17 @@
+{
+  "treasure": [
+    {
+      "id": "item.sanguine_lotus",
+      "name": "Sanguine Lotus",
+      "type": "herb",
+      "description": "A rare farbog flower prized by Silvia for healing salves."
+    },
+    {
+      "id": "item.siegfried_field_notes",
+      "name": "Field Notes on Corpse Logistics",
+      "type": "document",
+      "description": "Scribbled instructions for collecting bodies and wagon routes to the estate."
+    }
+  ]
+}
+

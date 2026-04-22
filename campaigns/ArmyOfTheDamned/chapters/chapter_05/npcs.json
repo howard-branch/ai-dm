@@ -1,0 +1,21 @@
+[
+  {
+    "id": "npc.eudora",
+    "name": "Eudora",
+    "role": "Dryad of the grove",
+    "appearance": "A statuesque dryad clothed in autumn leaves, warm-eyed and unsettlingly intimate.",
+    "personality": "Playful, therapeutic, and hungry for emotional honesty.",
+    "wants": "To experience truthful intimacy and to blunt Siegfried's corruption of the grove.",
+    "voice": "en-GB-MaisieNeural"
+  },
+  {
+    "id": "npc.siegfried_reinholdt",
+    "name": "Siegfried Reinholdt",
+    "role": "Alchemist of Mauer Estate",
+    "appearance": "A gaunt alchemist in a bloodstained apron, animated by fury more than rest.",
+    "personality": "Brilliant, grief-ravaged, obsessive, and morally shattered.",
+    "wants": "To punish vampires and cowards alike by raising an army that cannot turn away.",
+    "voice": "en-GB-ThomasNeural"
+  }
+]
+

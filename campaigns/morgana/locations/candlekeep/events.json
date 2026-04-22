@@ -1,3 +1,29 @@
 {
-  "events": []
+  "events": [
+    {
+      "id": "ambient.raven_cry",
+      "scene_id": "candlekeep_courtyard",
+      "kind": "ambient",
+      "every_seconds": 45,
+      "narration": "A raven cries once from the rookery. Somewhere a candle gutters."
+    },
+    {
+      "id": "ambient.tomeguard_argument",
+      "scene_id": "candlekeep_courtyard",
+      "kind": "ambient",
+      "trigger_after_seconds": 15,
+      "once": true,
+      "narration": "Two Tomeguard near the well break off their whispered argument as you approach. One of them touches the hilt of his sword."
+    },
+    {
+      "id": "ambient.sarcophagus_breath",
+      "scene_id": "candlekeep_courtyard",
+      "kind": "ambient",
+      "when": {
+        "flag_truthy": "noticed_sarcophagus"
+      },
+      "every_seconds": 30,
+      "narration": "From the cracked stone box: a long, dry exhale, like wind in a dead man's chest."
+    }
+  ]
 }

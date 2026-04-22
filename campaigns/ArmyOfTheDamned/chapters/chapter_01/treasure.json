@@ -1,0 +1,24 @@
+{
+  "treasure": [
+    {
+      "id": "loot.silver_tithe_bowl",
+      "name": "Silver Tithe Bowl",
+      "type": "valuables",
+      "value_gp": 15,
+      "description": "A dented but ornate silver collection bowl recovered from chapel rubble."
+    },
+    {
+      "id": "loot.silver_inlaid_dagger",
+      "name": "Silver-Inlaid Dagger",
+      "type": "weapon",
+      "description": "A practical blade that still holds a little holiness in its workmanship."
+    },
+    {
+      "id": "loot.avacyn_collar_anton",
+      "name": "Anton's Avacyn Collar",
+      "type": "holy_symbol",
+      "description": "A blessed silver chain Anton can no longer wear."
+    }
+  ]
+}
+

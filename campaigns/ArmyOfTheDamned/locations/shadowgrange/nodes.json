@@ -1,0 +1,44 @@
+{
+  "nodes": [
+    {
+      "id": "shadowgrange_gate",
+      "name": "Village Gate",
+      "description": "A drawbridge, moat, and heavy gatehouse guarded by Lars and Sven.",
+      "features": [
+        { "id": "object.shadowgrange_gate", "name": "Gate Test", "interactable": true, "tags": ["entrance", "holy"] }
+      ]
+    },
+    {
+      "id": "node.shadowgrange_market",
+      "name": "Market Square",
+      "description": "The social center of the village, where rumor, trade, and panic spread fast."
+    },
+    {
+      "id": "node.brunn_manor",
+      "name": "Brunn Manor",
+      "description": "The late mayor's haunted house, still avoided by most villagers.",
+      "features": [
+        { "id": "object.strionic_resonator", "name": "Strionic Resonator", "interactable": true, "tags": ["artifact", "quest"] }
+      ]
+    },
+    {
+      "id": "node.bountiful_heron",
+      "name": "Bountiful Heron",
+      "description": "Otto and Magda Botler's general store, warm on the surface and dangerous below it."
+    },
+    {
+      "id": "node.traft_memorial",
+      "name": "Saint Traft Memorial",
+      "description": "A memorial inside the chapel where visions and blessings may still linger.",
+      "features": [
+        { "id": "object.traft_memorial", "name": "Traft Memorial", "interactable": true, "tags": ["holy", "vision"] }
+      ]
+    },
+    {
+      "id": "node.visgaud_hall",
+      "name": "Visgaud Grounds",
+      "description": "Administrative and militia grounds where the council meets in crises."
+    }
+  ]
+}
+

@@ -1,0 +1,7 @@
+{
+  "npcs": [
+    { "id": "npc.eudora", "name": "Eudora", "default_anchor": "anchor.eudora_tree", "scene_id": "eudoras_bargain", "disposition": "playful" },
+    { "id": "npc.siegfried_reinholdt", "name": "Siegfried Reinholdt", "default_anchor": "anchor.control_dais", "scene_id": "storm_tower_laboratory", "disposition": "hostile" }
+  ]
+}
+

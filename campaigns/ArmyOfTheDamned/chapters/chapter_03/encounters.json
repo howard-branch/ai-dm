@@ -1,0 +1,24 @@
+[
+  {
+    "id": "encounter.shadowgrange_siege",
+    "name": "Siege of Shadowgrange",
+    "scene_id": "shadowgrange_siege",
+    "difficulty": "deadly",
+    "monsters": [
+      { "name": "Zombie", "count": 12 },
+      { "name": "Skeleton", "count": 6 },
+      { "name": "Stitched Abomination", "count": 1 }
+    ]
+  },
+  {
+    "id": "encounter.rinelda_breakthrough",
+    "name": "Rinelda at the Breach",
+    "scene_id": "shadowgrange_siege",
+    "difficulty": "hard",
+    "monsters": [
+      { "name": "Necromancer Acolyte", "count": 1 },
+      { "name": "Zombie", "count": 4 }
+    ]
+  }
+]
+

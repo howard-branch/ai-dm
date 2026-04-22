@@ -1,0 +1,23 @@
+{
+  "nodes": [
+    {
+      "id": "farbog_road",
+      "name": "Farbog Road",
+      "description": "The easiest route north through the swamp, churned by hundreds of undead footprints."
+    },
+    {
+      "id": "baskerville_ruins",
+      "name": "Baskerville Ruins",
+      "description": "The sunken remains of a village destroyed by terror and remembered through rumor."
+    },
+    {
+      "id": "corpse_wagon_route",
+      "name": "Corpse Wagon Route",
+      "description": "A stretch of road deeply scored by wagons filled with bodies.",
+      "features": [
+        { "id": "object.corpse_wagons", "name": "Corpse Wagons", "interactable": true, "tags": ["undead", "quest"] }
+      ]
+    }
+  ]
+}
+

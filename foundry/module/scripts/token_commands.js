@@ -1,10 +1,23 @@
-// Resolve a scene by Foundry id OR by name, so campaign manifests can use
-// stable human slugs instead of opaque auto-generated ids.
+// Resolve a scene by Foundry id OR by name (case-insensitive), so
+// campaign manifests can use stable human slugs instead of opaque
+// auto-generated ids.
 function resolveScene(sceneIdOrName) {
   if (!sceneIdOrName) return game.scenes?.current ?? null;
+  const target = String(sceneIdOrName).toLowerCase();
   return (
     game.scenes?.get(sceneIdOrName) ??
-    game.scenes?.find((s) => s.name === sceneIdOrName) ??
+    game.scenes?.find((s) => (s.name || "").toLowerCase() === target) ??
+    null
+  );
+}
+
+// Same idea for actors: id, then case-insensitive name match.
+function resolveActor(actorIdOrName) {
+  if (!actorIdOrName) return null;
+  const target = String(actorIdOrName).toLowerCase();
+  return (
+    game.actors?.get(actorIdOrName) ??
+    game.actors?.find((a) => (a.name || "").toLowerCase() === target) ??
     null
   );
 }
@@ -40,7 +53,7 @@ export async function spawnToken(sceneId, actorId, x, y, name = null) {
     throw new Error(`Scene not found: ${sceneId}`);
   }
 
-  const actor = game.actors?.get(actorId) ?? game.actors?.find((a) => a.name === actorId);
+  const actor = resolveActor(actorId);
   if (!actor) {
     throw new Error(`Actor not found: ${actorId}`);
   }

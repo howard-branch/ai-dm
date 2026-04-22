@@ -91,6 +91,60 @@ class EdgeTTSBackend:
             finally:
                 loop.close()
 
+    # ------------------------------------------------------------------ #
+    # Streaming path — yields MP3 chunks as edge-tts produces them, so a
+    # downstream player can begin decoding the first frames within a few
+    # hundred ms instead of waiting for the full clip.
+    # ------------------------------------------------------------------ #
+    def stream(self, text: str, voice: str | None = None):
+        """Yield MP3 chunks as they arrive from edge-tts.
+
+        Implemented by running the async stream on a private event loop
+        in a daemon thread, and pulling chunks through a thread-safe
+        queue. The generator is exhausted when the upstream stream
+        completes (or raises).
+        """
+        if not text.strip():
+            return
+        if not self.is_available():
+            raise RuntimeError("edge-tts not installed")
+
+        import asyncio
+        import queue
+        import threading
+
+        import edge_tts  # type: ignore[import-not-found]
+
+        q: "queue.Queue[bytes | None | BaseException]" = queue.Queue(maxsize=64)
+        sentinel = None
+        chosen_voice = voice or self.default_voice
+
+        async def _producer() -> None:
+            try:
+                communicate = edge_tts.Communicate(text, chosen_voice)
+                async for chunk in communicate.stream():
+                    if chunk.get("type") == "audio":
+                        data = chunk.get("data") or b""
+                        if data:
+                            q.put(data)
+            except BaseException as exc:  # noqa: BLE001
+                q.put(exc)
+            finally:
+                q.put(sentinel)
+
+        def _run() -> None:
+            asyncio.run(_producer())
+
+        threading.Thread(target=_run, name="edge-tts-stream", daemon=True).start()
+
+        while True:
+            item = q.get()
+            if item is sentinel:
+                return
+            if isinstance(item, BaseException):
+                raise item
+            yield item
+
 
 class PiperBackend:
     """Offline TTS via the piper binary (https://github.com/rhasspy/piper)."""

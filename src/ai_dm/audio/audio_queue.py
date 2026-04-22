@@ -114,14 +114,36 @@ class AudioQueue:
                 continue
             self._processing = True
             self._interrupted.clear()
-            try:
-                audio = self.backend.synthesize(item.text, item.voice)
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("TTS synthesise failed: %s", exc)
-                audio = b""
-            if not self._interrupted.is_set() and self.sink is not None:
-                try:
-                    self.sink(item, audio)
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning("audio sink failed: %s", exc)
+            self._handle_item(item)
             self._processing = False
+
+    # ------------------------------------------------------------------ #
+
+    def _handle_item(self, item: AudioItem) -> None:
+        # Streaming fast-path: backend yields chunks AND the sink
+        # advertises a stream entry point. This lets the player begin
+        # decoding while later chunks are still being downloaded from
+        # the TTS provider — typically saves multiple seconds on long
+        # narrations.
+        stream_fn = getattr(self.backend, "stream", None)
+        sink_stream = getattr(self.sink, "stream", None) if self.sink else None
+        if callable(stream_fn) and callable(sink_stream):
+            try:
+                chunks = stream_fn(item.text, item.voice)
+                if not self._interrupted.is_set():
+                    sink_stream(item, chunks)
+                return
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("TTS stream failed (%s); falling back to buffered", exc)
+
+        # Buffered path.
+        try:
+            audio = self.backend.synthesize(item.text, item.voice)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("TTS synthesise failed: %s", exc)
+            audio = b""
+        if not self._interrupted.is_set() and self.sink is not None:
+            try:
+                self.sink(item, audio)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("audio sink failed: %s", exc)

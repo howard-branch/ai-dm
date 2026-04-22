@@ -1,0 +1,23 @@
+{
+  "nodes": [
+    {
+      "id": "node.mauer_estate_grove",
+      "name": "Mauer Grove",
+      "description": "An old grove of oaks surrounding the estate and watched by Eudora."
+    },
+    {
+      "id": "node.mauer_courtyard",
+      "name": "Estate Clearing",
+      "description": "The muddy clearing around the manor, alive with trench work and lightning.",
+      "features": [
+        { "id": "object.mauer_entry", "name": "Estate Entry", "interactable": true, "tags": ["quest", "entrance"] }
+      ]
+    },
+    {
+      "id": "node.storm_tower",
+      "name": "Storm Tower",
+      "description": "The tower laboratory where Siegfried channels lightning into his final creation."
+    }
+  ]
+}
+

@@ -17,7 +17,7 @@ from ai_dm.ai.narrator import Narrator
 from ai_dm.ai.planner import StoryPlanner
 from ai_dm.audio.audio_queue import AudioQueue
 from ai_dm.audio.narration_dispatcher import NarrationDispatcher
-from ai_dm.audio.playback import play_bytes
+from ai_dm.audio.playback import play_bytes, play_stream
 from ai_dm.audio.tts import NullBackend, TTSBackend, default_backend
 from ai_dm.audio.voices import VoiceProfile
 from ai_dm.campaign.pack import CampaignPack, seed_characters
@@ -244,9 +244,22 @@ class Container:
             pack.paths.voices,
             default_voice=cfg.edge_voice,
         )
+        # Sink: a callable for the buffered path, plus a ``.stream``
+        # attribute that the AudioQueue will prefer when the backend
+        # exposes a ``stream(text, voice)`` generator. Streaming pipes
+        # MP3 chunks straight to ffplay's stdin so playback starts
+        # within ~200ms instead of waiting for the full clip.
+        def _sink(_item, audio):  # noqa: ANN001
+            play_bytes(audio)
+
+        def _sink_stream(_item, chunks):  # noqa: ANN001
+            play_stream(chunks)
+
+        _sink.stream = _sink_stream  # type: ignore[attr-defined]
+
         audio_queue = AudioQueue(
             tts,
-            sink=lambda _item, audio: play_bytes(audio),
+            sink=_sink,
             autostart=cfg.audio_enabled,
         )
         narration_dispatcher = NarrationDispatcher(

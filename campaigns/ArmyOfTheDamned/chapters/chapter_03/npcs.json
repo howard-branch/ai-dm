@@ -1,0 +1,20 @@
+[
+  {
+    "id": "npc.rinelda_smitt",
+    "name": "Rinelda Smitt",
+    "role": "Young necromancer",
+    "appearance": "A bright-eyed girl moving through slaughter with theatrical delight and terrible focus.",
+    "personality": "Cruel, gleeful, and fascinated by power over death.",
+    "wants": "To impress Siegfried and revel in the destruction she helps command.",
+    "voice": "en-GB-MaisieNeural"
+  },
+  {
+    "id": "npc.mordov_refugees",
+    "name": "Mordov Refugees",
+    "role": "Witnesses",
+    "appearance": "Mud-caked survivors wrapped in blankets, speaking as if the fog still follows them.",
+    "personality": "Shocked, exhausted, and grateful to be believed.",
+    "voice": "en-GB-RyanNeural"
+  }
+]
+

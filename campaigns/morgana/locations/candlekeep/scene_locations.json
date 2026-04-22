@@ -1,20 +1,121 @@
 [
   {
-    "scene_id": "scene-candlekeep-gate",
+    "scene_id": "candlekeep_courtyard",
     "anchors": [
-      { "id": "anchor.altar", "name": "altar", "scene_id": "scene-candlekeep-gate", "x": 1200, "y": 800, "tags": ["sacred"] },
-      { "id": "anchor.main_door", "name": "main_door", "scene_id": "scene-candlekeep-gate", "x": 200, "y": 1500, "tags": ["entrance"] }
+      {
+        "id": "anchor.gate_inner",
+        "name": "gate_inner",
+        "scene_id": "candlekeep_courtyard",
+        "x": 300,
+        "y": 1800,
+        "tags": [
+          "entrance",
+          "spawn:morgana"
+        ]
+      },
+      {
+        "id": "anchor.well",
+        "name": "well",
+        "scene_id": "candlekeep_courtyard",
+        "x": 1200,
+        "y": 1100,
+        "tags": [
+          "landmark"
+        ]
+      },
+      {
+        "id": "anchor.sarcophagus",
+        "name": "sarcophagus",
+        "scene_id": "candlekeep_courtyard",
+        "x": 2050,
+        "y": 900,
+        "tags": [
+          "quest",
+          "necromancy"
+        ]
+      },
+      {
+        "id": "anchor.cloister_door",
+        "name": "cloister_door",
+        "scene_id": "candlekeep_courtyard",
+        "x": 1200,
+        "y": 200,
+        "tags": [
+          "exit",
+          "locked"
+        ]
+      },
+      {
+        "id": "anchor.rookery_stair",
+        "name": "rookery_stair",
+        "scene_id": "candlekeep_courtyard",
+        "x": 150,
+        "y": 450,
+        "tags": [
+          "exit"
+        ]
+      }
     ],
     "zones": [
       {
-        "id": "zone.library_north_wing",
-        "name": "library_north_wing",
-        "scene_id": "scene-candlekeep-gate",
+        "id": "zone.cloister",
+        "name": "cloister",
+        "scene_id": "candlekeep_courtyard",
         "shape": "rect",
-        "rect": [800, 200, 2000, 1200],
-        "tags": ["quiet"]
+        "rect": [
+          200,
+          200,
+          2200,
+          2000
+        ],
+        "tags": [
+          "sacred",
+          "lit"
+        ]
+      },
+      {
+        "id": "zone.exhumation",
+        "name": "exhumation",
+        "scene_id": "candlekeep_courtyard",
+        "shape": "rect",
+        "rect": [
+          1800,
+          700,
+          2300,
+          1100
+        ],
+        "tags": [
+          "danger",
+          "quest",
+          "trigger:proximity_morgana"
+        ]
       }
     ]
+  },
+  {
+    "scene_id": "candlekeep_scriptorium",
+    "anchors": [
+      {
+        "id": "anchor.scriptorium_door",
+        "name": "door",
+        "scene_id": "candlekeep_scriptorium",
+        "x": 200,
+        "y": 1200,
+        "tags": [
+          "entrance"
+        ]
+      },
+      {
+        "id": "anchor.index_desk",
+        "name": "index_desk",
+        "scene_id": "candlekeep_scriptorium",
+        "x": 1500,
+        "y": 600,
+        "tags": [
+          "quest"
+        ]
+      }
+    ],
+    "zones": []
   }
 ]
-

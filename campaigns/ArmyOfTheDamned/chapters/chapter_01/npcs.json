@@ -1,0 +1,29 @@
+[
+  {
+    "id": "npc.anton_wepper",
+    "name": "Anton Wepper",
+    "role": "Cursed shepherd",
+    "appearance": "A pale and exhausted shepherd in torn clothes, carrying guilt almost as heavily as his pack.",
+    "personality": "Frightened, sincere, and desperate to avoid becoming a monster.",
+    "wants": "Safe passage to Shadowgrange and a chance to isolate himself before the full moon.",
+    "fears": "Hurting innocents after transforming into a werewolf.",
+    "voice": "en-GB-RyanNeural"
+  },
+  {
+    "id": "npc.lars",
+    "name": "Lars",
+    "role": "Shadowgrange gate guard",
+    "appearance": "A broad-shouldered cathar whose seriousness breaks the moment he spots fresh travelers.",
+    "personality": "Friendly, curious, and dramatic.",
+    "voice": "en-GB-ThomasNeural"
+  },
+  {
+    "id": "npc.sven",
+    "name": "Sven",
+    "role": "Shadowgrange gate guard",
+    "appearance": "A stern twin to Lars, iron-backed and intensely procedural.",
+    "personality": "Dry, disciplined, and suspicious.",
+    "voice": "en-GB-RyanNeural"
+  }
+]
+

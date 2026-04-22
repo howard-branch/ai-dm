@@ -1,0 +1,31 @@
+{
+  "id": "avacyn_pilgrim",
+  "name": "Mira Voss",
+  "pronouns": "she/her",
+  "race": "Human",
+  "class": "Fighter",
+  "subclass": "Cathar Initiate",
+  "level": 1,
+  "background": "Pilgrim-Messenger",
+  "alignment": "neutral good",
+  "voice": "en-GB-SoniaNeural",
+  "appearance": "A road-worn Stensian woman in patched mail with a travel cloak, a lantern, and a silver Avacyn collar at her throat.",
+  "personality": "Steady, practical, suspicious of miracles but unwilling to abandon the innocent.",
+  "ideals": ["Courage is what remains when faith becomes difficult."],
+  "bonds": ["Sent from the Church to locate Katarina Brunn and recover the Strionic Resonator if necessary."],
+  "flaws": ["Too quick to shoulder responsibility that should be shared."],
+  "abilities": { "str": 15, "dex": 12, "con": 14, "int": 10, "wis": 13, "cha": 11 },
+  "skills": { "athletics": 4, "insight": 3, "perception": 3, "religion": 2, "survival": 3 },
+  "ac": 16,
+  "hp": { "current": 12, "max": 12, "temp": 0 },
+  "speed": 30,
+  "inventory": [
+    { "id": "item.spear", "name": "Spear", "qty": 1, "equipped": true },
+    { "id": "item.crossbow", "name": "Light Crossbow", "qty": 1, "equipped": true },
+    { "id": "item.bolts", "name": "Crossbow Bolts", "qty": 20 },
+    { "id": "item.travelers_pack", "name": "Traveler's Pack", "qty": 1 },
+    { "id": "item.avacyn_collar", "name": "Avacyn Collar", "qty": 1, "tags": ["holy"] }
+  ],
+  "notes": "Default starter hero for the Army of the Damned pack. She is traveling from Thraben toward Shadowgrange when play begins."
+}
+

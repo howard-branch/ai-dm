@@ -1,0 +1,11 @@
+[
+  {
+    "id": "npc.farbog_survivor",
+    "name": "Farbog Survivor",
+    "role": "Optional witness",
+    "appearance": "A half-drowned wanderer who looks like the swamp has been trying to keep them.",
+    "personality": "Superstitious, shaken, useful when calmed.",
+    "voice": "en-GB-RyanNeural"
+  }
+]
+

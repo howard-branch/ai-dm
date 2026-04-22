@@ -1,0 +1,12 @@
+{
+  "npcs": [
+    {
+      "id": "npc.anton_wepper",
+      "name": "Anton Wepper",
+      "default_anchor": "anchor.anton_kneeling",
+      "scene_id": "roadside_shrine",
+      "disposition": "afraid"
+    }
+  ]
+}
+

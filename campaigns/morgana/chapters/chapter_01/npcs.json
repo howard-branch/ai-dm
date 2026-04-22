@@ -1,3 +1,52 @@
-{
-  "npcs": []
-}
+[
+  {
+    "id": "npc.beren",
+    "name": "Old Beren",
+    "role": "Gatekeeper of Candlekeep",
+    "voice": "en-GB-RyanNeural",
+    "appearance": "A stooped, bearded Avowed in faded grey robes. Lantern in one hand, iron key in the other. One milky eye.",
+    "personality": "Pedantic, courteous, deeply tired. Loves a clever turn of phrase. Will bend rules for a genuinely rare book.",
+    "wants": "A Gift of Knowledge worthy of the keep — or a convincing performance of one.",
+    "fears": "That the thing in the courtyard remembers his face.",
+    "knows": [
+      "The Avowed unearthed the sarcophagus three nights ago while repairing the cloister.",
+      "The Keeper of Tomes has forbidden anyone from approaching it.",
+      "Ily, the raven-keeper's apprentice, has been sneaking out after curfew."
+    ],
+    "stats": {
+      "ac": 11,
+      "hp": 14,
+      "passive_perception": 13
+    }
+  },
+  {
+    "id": "npc.ily",
+    "name": "Ily Vass",
+    "role": "Apprentice Raven-Keeper",
+    "voice": "en-GB-MaisieNeural",
+    "appearance": "A wiry teenager in too-long robes, ink under her fingernails, a black raven on her shoulder.",
+    "personality": "Sharp, sleepless, hungry for forbidden things. Speaks fast. Trusts ravens more than people.",
+    "wants": "To be apprenticed to the Vault, not the rookery.",
+    "fears": "Being sent home to her village in disgrace.",
+    "knows": [
+      "She watched the sarcophagus crack open from the rookery balcony.",
+      "Something climbed out and then climbed back in.",
+      "There is an index card in the scriptorium pointing to the Vault of Veiled Names."
+    ],
+    "stats": {
+      "ac": 12,
+      "hp": 8,
+      "passive_perception": 14
+    }
+  },
+  {
+    "id": "npc.tomeguard_captain",
+    "name": "Captain Vey of the Tomeguard",
+    "role": "Captain of the Tomeguard",
+    "voice": "en-GB-ThomasNeural",
+    "appearance": "Lean, scarred, chainmail under a grey tabard embroidered with an open book.",
+    "personality": "Skeptical of outsiders, especially spellcasters. Pragmatic. Will ally with Morgana if she contains the threat.",
+    "wants": "The courtyard sealed and the Keeper of Tomes informed without panic.",
+    "fears": "Losing another guard to whatever's in that box."
+  }
+]

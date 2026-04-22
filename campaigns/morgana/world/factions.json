@@ -1,3 +1,55 @@
 {
-  "factions": []
+  "factions": [
+    {
+      "id": "faction.avowed",
+      "name": "The Avowed of Candlekeep",
+      "alignment": "lawful neutral",
+      "agenda": "Catalogue all knowledge; reveal almost none.",
+      "disposition_to_morgana": "guarded",
+      "leaders": [
+        "The Keeper of Tomes (unseen)"
+      ],
+      "tags": [
+        "library",
+        "neutral",
+        "host"
+      ]
+    },
+    {
+      "id": "faction.tomeguard",
+      "name": "The Tomeguard",
+      "alignment": "lawful neutral",
+      "agenda": "Defend the keep. Keep the courtyard quiet.",
+      "disposition_to_morgana": "wary",
+      "leaders": [
+        "Captain Vey"
+      ],
+      "tags": [
+        "soldiers",
+        "candlekeep"
+      ]
+    },
+    {
+      "id": "faction.velmis",
+      "name": "The Academy at Velmis",
+      "alignment": "lawful neutral",
+      "agenda": "Enforce the Naming Accord; recover its exiled students or silence them.",
+      "disposition_to_morgana": "hostile",
+      "tags": [
+        "antagonist",
+        "background"
+      ]
+    },
+    {
+      "id": "faction.hollow_choir",
+      "name": "The Hollow Choir",
+      "alignment": "chaotic evil",
+      "agenda": "Re-name the dead and bind them in service.",
+      "disposition_to_morgana": "interested",
+      "tags": [
+        "cult",
+        "antagonist"
+      ]
+    }
+  ]
 }

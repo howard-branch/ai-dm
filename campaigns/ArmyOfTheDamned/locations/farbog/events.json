@@ -1,0 +1,19 @@
+{
+  "events": [
+    {
+      "id": "ambient.bog_breath",
+      "scene_id": "farbog_road",
+      "kind": "ambient",
+      "every_seconds": 45,
+      "narration": "The bog releases a sour breath of rot and wet earth."
+    },
+    {
+      "id": "ambient.false_howl",
+      "scene_id": "baskerville_ruins",
+      "kind": "ambient",
+      "every_seconds": 35,
+      "narration": "A deep howl rolls through the fog, though nothing leaves prints in the muck."
+    }
+  ]
+}
+

@@ -1,5 +1,20 @@
+// Resolve an actor by Foundry id OR by case-insensitive name. Lets
+// campaign manifests reference actors by stable human slugs.
+function resolveActor(actorIdOrName) {
+  if (!actorIdOrName) return null;
+  const target = String(actorIdOrName).toLowerCase();
+  return (
+    game.actors?.get(actorIdOrName) ??
+    game.actors?.find((a) => (a.name || "").toLowerCase() === target) ??
+    null
+  );
+}
+
 export async function createActor(name, actorType = "npc") {
-  const existing = game.actors?.find((a) => a.name === name && a.type === actorType);
+  const existing = game.actors?.find(
+    (a) => (a.name || "").toLowerCase() === String(name).toLowerCase()
+        && a.type === actorType
+  );
   if (existing) {
     return existing;
   }
@@ -17,7 +32,7 @@ export async function createActor(name, actorType = "npc") {
 }
 
 export async function updateActor(actorId, patch) {
-  const actor = game.actors?.get(actorId);
+  const actor = resolveActor(actorId);
   if (!actor) {
     throw new Error(`Actor not found: ${actorId}`);
   }
@@ -55,7 +70,7 @@ export async function highlightObject(targetId) {
 }
 
 export async function deleteActor(actorId) {
-  const actor = game.actors?.get(actorId);
+  const actor = resolveActor(actorId);
   if (!actor) {
     return { deleted: false, reason: "actor_not_found" };
   }
@@ -64,7 +79,7 @@ export async function deleteActor(actorId) {
 }
 
 export async function readActor(actorId) {
-  const actor = game.actors?.get(actorId);
+  const actor = resolveActor(actorId);
   if (!actor) {
     return null;
   }

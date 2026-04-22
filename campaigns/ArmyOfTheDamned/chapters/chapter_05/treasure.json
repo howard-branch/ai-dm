@@ -1,0 +1,23 @@
+{
+  "treasure": [
+    {
+      "id": "item.mauer_laboratory_cache",
+      "name": "Mauer Laboratory Cache",
+      "type": "alchemy",
+      "description": "Rare reagents, notes, and silver apparatus salvaged from the laboratory."
+    },
+    {
+      "id": "item.resonator_fragment",
+      "name": "Resonator Fragment",
+      "type": "artifact_component",
+      "description": "A final component or attunement note that clarifies how the Resonator relates to Avacyn's rescue."
+    },
+    {
+      "id": "item.storm_conductor_rod",
+      "name": "Storm Conductor Rod",
+      "type": "arcane_focus",
+      "description": "A metal rod etched with alchemical glyphs used to channel lightning into the tower."
+    }
+  ]
+}
+

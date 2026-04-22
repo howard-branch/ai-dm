@@ -62,6 +62,16 @@ def build_runtime(settings: Settings | None = None) -> Runtime:
     container = Container.build(
         ContainerConfig(pack=pack, audio_enabled=audio_enabled, edge_voice=edge_voice)
     )
+
+    # Inject the active player character into the prompt context so the
+    # narrator knows who's speaking. Pulled from the manifest's
+    # ``start.player_character`` and the live character sheet (seeded
+    # on first run by the container build).
+    pc_id = (pack.manifest.start or {}).get("player_character")
+    pc_sheet = _load_character_sheet(pack, pc_id) if pc_id else None
+    if pc_sheet and container.prompt_context is not None:
+        container.prompt_context.character = pc_sheet
+
     state_store = StateStore(base=pack.state.saves)
     director = Director(
         state_store=state_store,

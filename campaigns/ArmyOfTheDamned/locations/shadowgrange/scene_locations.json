@@ -1,0 +1,85 @@
+[
+  {
+    "scene_id": "shadowgrange_gate",
+    "anchors": [
+      { "id": "anchor.drawbridge", "name": "drawbridge", "scene_id": "shadowgrange_gate", "x": 200, "y": 1500, "tags": ["entrance"] },
+      { "id": "anchor.gatehouse", "name": "gatehouse", "scene_id": "shadowgrange_gate", "x": 1100, "y": 800, "tags": ["npc"] }
+    ],
+    "zones": [
+      { "id": "zone.gate_approach", "name": "gate_approach", "scene_id": "shadowgrange_gate", "shape": "rect", "rect": [100, 500, 1700, 1800], "tags": ["entrance"] }
+    ]
+  },
+  {
+    "scene_id": "shadowgrange_market",
+    "anchors": [
+      { "id": "anchor.market_square", "name": "market_square", "scene_id": "shadowgrange_market", "x": 1000, "y": 1000, "tags": ["hub"] },
+      { "id": "anchor.silver_rose", "name": "silver_rose", "scene_id": "shadowgrange_market", "x": 550, "y": 500, "tags": ["inn"] },
+      { "id": "anchor.visgaud_hall", "name": "visgaud_hall", "scene_id": "shadowgrange_market", "x": 1450, "y": 600, "tags": ["council"] },
+      { "id": "anchor.chapel", "name": "chapel", "scene_id": "shadowgrange_market", "x": 1400, "y": 1300, "tags": ["holy"] }
+    ],
+    "zones": [
+      { "id": "zone.market", "name": "market", "scene_id": "shadowgrange_market", "shape": "rect", "rect": [250, 250, 1800, 1750], "tags": ["hub", "village"] }
+    ]
+  },
+  {
+    "scene_id": "brunn_manor",
+    "anchors": [
+      { "id": "anchor.front_door", "name": "front_door", "scene_id": "brunn_manor", "x": 300, "y": 1500, "tags": ["entrance"] },
+      { "id": "anchor.music_room", "name": "music_room", "scene_id": "brunn_manor", "x": 1200, "y": 700, "tags": ["quest"] }
+    ],
+    "zones": [
+      { "id": "zone.manor_hall", "name": "manor_hall", "scene_id": "brunn_manor", "shape": "rect", "rect": [200, 300, 1700, 1700], "tags": ["haunted"] }
+    ]
+  },
+  {
+    "scene_id": "bountiful_heron_store",
+    "anchors": [
+      { "id": "anchor.store_counter", "name": "store_counter", "scene_id": "bountiful_heron_store", "x": 1100, "y": 700, "tags": ["npc"] }
+    ],
+    "zones": [
+      { "id": "zone.shop_floor", "name": "shop_floor", "scene_id": "bountiful_heron_store", "shape": "rect", "rect": [250, 250, 1700, 1350], "tags": ["shop"] }
+    ]
+  },
+  {
+    "scene_id": "saint_traft_memorial",
+    "anchors": [
+      { "id": "anchor.memorial", "name": "memorial", "scene_id": "saint_traft_memorial", "x": 1100, "y": 650, "tags": ["holy", "quest"] },
+      { "id": "anchor.pews", "name": "pews", "scene_id": "saint_traft_memorial", "x": 900, "y": 1200, "tags": ["rest"] }
+    ],
+    "zones": [
+      { "id": "zone.chapel", "name": "chapel", "scene_id": "saint_traft_memorial", "shape": "rect", "rect": [250, 200, 1700, 1600], "tags": ["holy"] }
+    ]
+  },
+  {
+    "scene_id": "visgaud_council",
+    "anchors": [
+      { "id": "anchor.council_table", "name": "council_table", "scene_id": "visgaud_council", "x": 1100, "y": 900, "tags": ["council"] }
+    ],
+    "zones": [
+      { "id": "zone.town_hall", "name": "town_hall", "scene_id": "visgaud_council", "shape": "rect", "rect": [300, 350, 1700, 1400], "tags": ["council"] }
+    ]
+  },
+  {
+    "scene_id": "mordov_refugees",
+    "anchors": [
+      { "id": "anchor.refugee_wagons", "name": "refugee_wagons", "scene_id": "mordov_refugees", "x": 800, "y": 950, "tags": ["wagon"] },
+      { "id": "anchor.healers", "name": "healers", "scene_id": "mordov_refugees", "x": 1300, "y": 800, "tags": ["aid"] }
+    ],
+    "zones": [
+      { "id": "zone.refugee_camp", "name": "refugee_camp", "scene_id": "mordov_refugees", "shape": "rect", "rect": [250, 350, 1800, 1500], "tags": ["crisis"] }
+    ]
+  },
+  {
+    "scene_id": "shadowgrange_siege",
+    "anchors": [
+      { "id": "anchor.north_wall", "name": "north_wall", "scene_id": "shadowgrange_siege", "x": 1100, "y": 250, "tags": ["defense"] },
+      { "id": "anchor.breach", "name": "breach", "scene_id": "shadowgrange_siege", "x": 1300, "y": 500, "tags": ["danger"] },
+      { "id": "anchor.market_fallback", "name": "market_fallback", "scene_id": "shadowgrange_siege", "x": 1100, "y": 1300, "tags": ["fallback"] }
+    ],
+    "zones": [
+      { "id": "zone.wall_top", "name": "wall_top", "scene_id": "shadowgrange_siege", "shape": "rect", "rect": [250, 100, 1850, 500], "tags": ["defense"] },
+      { "id": "zone.inner_street", "name": "inner_street", "scene_id": "shadowgrange_siege", "shape": "rect", "rect": [250, 500, 1850, 1750], "tags": ["battle"] }
+    ]
+  }
+]
+

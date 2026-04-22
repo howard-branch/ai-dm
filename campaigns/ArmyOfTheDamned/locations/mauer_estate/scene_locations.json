@@ -1,0 +1,46 @@
+[
+  {
+    "scene_id": "mauer_grove_approach",
+    "anchors": [
+      { "id": "anchor.grove_edge", "name": "grove_edge", "scene_id": "mauer_grove_approach", "x": 250, "y": 1500, "tags": ["entrance"] },
+      { "id": "anchor.secret_tree", "name": "secret_tree", "scene_id": "mauer_grove_approach", "x": 1200, "y": 750, "tags": ["secret"] }
+    ],
+    "zones": [
+      { "id": "zone.grove", "name": "grove", "scene_id": "mauer_grove_approach", "shape": "rect", "rect": [150, 200, 1800, 1700], "tags": ["forest", "social"] }
+    ]
+  },
+  {
+    "scene_id": "eudoras_bargain",
+    "anchors": [
+      { "id": "anchor.eudora_tree", "name": "eudora_tree", "scene_id": "eudoras_bargain", "x": 1100, "y": 700, "tags": ["npc"] },
+      { "id": "anchor.tunnel_root", "name": "tunnel_root", "scene_id": "eudoras_bargain", "x": 1400, "y": 900, "tags": ["secret", "exit"] }
+    ],
+    "zones": [
+      { "id": "zone.confession_ring", "name": "confession_ring", "scene_id": "eudoras_bargain", "shape": "rect", "rect": [500, 350, 1600, 1250], "tags": ["social"] }
+    ]
+  },
+  {
+    "scene_id": "mauer_estate_courtyard",
+    "anchors": [
+      { "id": "anchor.main_gate", "name": "main_gate", "scene_id": "mauer_estate_courtyard", "x": 1100, "y": 1550, "tags": ["entrance"] },
+      { "id": "anchor.front_doors", "name": "front_doors", "scene_id": "mauer_estate_courtyard", "x": 1100, "y": 650, "tags": ["quest"] },
+      { "id": "anchor.stables", "name": "stables", "scene_id": "mauer_estate_courtyard", "x": 1650, "y": 950, "tags": ["side_entry"] },
+      { "id": "anchor.cellar_doors", "name": "cellar_doors", "scene_id": "mauer_estate_courtyard", "x": 550, "y": 500, "tags": ["side_entry"] }
+    ],
+    "zones": [
+      { "id": "zone.trench_line", "name": "trench_line", "scene_id": "mauer_estate_courtyard", "shape": "rect", "rect": [250, 350, 1850, 1700], "tags": ["battle", "storm"] }
+    ]
+  },
+  {
+    "scene_id": "storm_tower_laboratory",
+    "anchors": [
+      { "id": "anchor.lightning_coil", "name": "lightning_coil", "scene_id": "storm_tower_laboratory", "x": 1200, "y": 300, "tags": ["hazard"] },
+      { "id": "anchor.operating_table", "name": "operating_table", "scene_id": "storm_tower_laboratory", "x": 1100, "y": 950, "tags": ["boss"] },
+      { "id": "anchor.control_dais", "name": "control_dais", "scene_id": "storm_tower_laboratory", "x": 650, "y": 700, "tags": ["quest"] }
+    ],
+    "zones": [
+      { "id": "zone.laboratory", "name": "laboratory", "scene_id": "storm_tower_laboratory", "shape": "rect", "rect": [350, 150, 1850, 1500], "tags": ["boss", "storm"] }
+    ]
+  }
+]
+

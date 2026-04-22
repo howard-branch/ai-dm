@@ -20,12 +20,16 @@ class PromptContextBuilder:
         relationships: RelationshipMatrix | None = None,
         location_service: LocationService | None = None,
         story_planner=None,
+        character: dict | None = None,
     ) -> None:
         self.state_store = state_store
         self.npc_memory = npc_memory
         self.relationships = relationships
         self.location_service = location_service
         self.story_planner = story_planner
+        # Active player character sheet. The narrator uses this to know
+        # who is acting / speaking. Update at runtime to swap PCs.
+        self.character = character
 
     def build(
         self,
@@ -35,6 +39,8 @@ class PromptContextBuilder:
         scene_id: str | None = None,
     ) -> dict:
         context: dict = {}
+        if self.character:
+            context["player_character"] = self.character
         if self.state_store is not None:
             try:
                 context["state"] = self.state_store.get_context()

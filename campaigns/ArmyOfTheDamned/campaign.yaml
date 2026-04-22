@@ -1,0 +1,10 @@
+id: ArmyOfTheDamned
+name: "Army of the Damned"
+version: 0.1.0
+overrides: {}
+entrypoints:
+  first_chapter: chapter_01
+start:
+  scene: hofsaddel_pass
+  player_character: avacyn_pilgrim
+

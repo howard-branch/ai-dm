@@ -1,0 +1,45 @@
+{
+  "scenes": [
+    {
+      "id": "eudoras_bargain",
+      "name": "Lady of the Woods",
+      "location_id": "mauer_estate",
+      "summary": "Eudora the dryad tests the party's honesty and may offer a secret path into the estate.",
+      "starting_anchor": "anchor.grove_edge",
+      "beats": [
+        {
+          "id": "beat.win_eudora",
+          "summary": "Earn Eudora's help by truth, charm, or careful manipulation.",
+          "completes_on": { "event": "intent.resolved", "intent_type": "speak", "target_id": "npc.eudora" }
+        }
+      ]
+    },
+    {
+      "id": "mauer_estate_courtyard",
+      "name": "The Estate in the Storm",
+      "location_id": "mauer_estate",
+      "summary": "Rain lashes the manor while zombies dig trenches around old walls and hidden defenses wait in stone and shadow.",
+      "beats": [
+        {
+          "id": "beat_breach_estate",
+          "summary": "Choose and execute an entry plan.",
+          "completes_on": { "event": "intent.resolved", "intent_type": "interact", "target_id": "object.mauer_entry" }
+        }
+      ]
+    },
+    {
+      "id": "storm_tower_laboratory",
+      "name": "The Perfect Storm",
+      "location_id": "mauer_estate",
+      "summary": "At the top of the tower, lightning, necro-alchemy, and unresolved grief converge around Siegfried's final experiment.",
+      "beats": [
+        {
+          "id": "beat.stop_siegfried",
+          "summary": "Defeat or stop Siegfried before the storm animates his masterpiece.",
+          "completes_on": { "event": "combat.encounter_ended", "encounter_id": "encounter.siegfrieds_storm" }
+        }
+      ]
+    }
+  ]
+}
+

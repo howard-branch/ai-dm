@@ -1,0 +1,77 @@
+{
+  "scenes": [
+    {
+      "id": "hofsaddel_pass",
+      "name": "Hofsaddel Pass",
+      "location_id": "stensia_road",
+      "summary": "The party crosses into Stensia's outer valley beneath Castle Falkenrath and the red light of evening.",
+      "time_of_day": "dusk",
+      "starting_anchor": "anchor.pass_overlook",
+      "beats": [
+        {
+          "id": "beat.enter_stensia",
+          "summary": "Take in the valley and accept the danger of the road ahead.",
+          "completes_on": { "event": "scene.entered", "scene_id": "hofsaddel_pass" }
+        },
+        {
+          "id": "beat.choose_road_trials",
+          "summary": "Survive or avoid several road encounters on the way to Shadowgrange.",
+          "completes_on": { "event": "intent.resolved", "intent_type": "travel", "target_id": "road.shadowgrange" }
+        }
+      ]
+    },
+    {
+      "id": "ruined_chapel",
+      "name": "Ancient Devotees",
+      "location_id": "stensia_road",
+      "summary": "A collapsed chapel still hosts an undead service that can be ended by steel or by reverence.",
+      "beats": [
+        {
+          "id": "beat.lay_dead_to_rest",
+          "summary": "Decide whether to destroy or release the skeletal worshippers.",
+          "completes_on": { "event": "combat.encounter_ended", "encounter_id": "encounter.ancient_devotees" }
+        }
+      ]
+    },
+    {
+      "id": "cultist_cave",
+      "name": "Explosive Summoning",
+      "location_id": "stensia_road",
+      "summary": "A demon has just been summoned from a scorched roadside cave, leaving lesser fiends and clues behind.",
+      "beats": [
+        {
+          "id": "beat.inspect_cave",
+          "summary": "Investigate the scorched ritual site and track the cult's survivors toward Shadowgrange.",
+          "completes_on": { "event": "intent.resolved", "intent_type": "interact", "target_id": "object.ritual_cave" }
+        }
+      ]
+    },
+    {
+      "id": "roadside_shrine",
+      "name": "Wolf in Sheep's Clothing",
+      "location_id": "stensia_road",
+      "summary": "Anton Wepper begs for company and concealment while the full moon approaches.",
+      "beats": [
+        {
+          "id": "beat.meet_anton",
+          "summary": "Learn Anton's fear and decide whether to help, abandon, or expose him.",
+          "completes_on": { "event": "intent.resolved", "intent_type": "speak", "target_id": "npc.anton_wepper" }
+        }
+      ]
+    },
+    {
+      "id": "shadowgrange_gate",
+      "name": "Arrival at Shadowgrange",
+      "location_id": "shadowgrange",
+      "summary": "The road finally reaches Shadowgrange's moat and gatehouse, where Lars and Sven test newcomers with blessed silver.",
+      "beats": [
+        {
+          "id": "beat.enter_shadowgrange",
+          "summary": "Pass the gate test and enter the village.",
+          "completes_on": { "event": "intent.resolved", "intent_type": "interact", "target_id": "object.shadowgrange_gate" }
+        }
+      ]
+    }
+  ]
+}
+

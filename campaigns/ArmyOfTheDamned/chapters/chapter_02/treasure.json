@@ -1,0 +1,23 @@
+{
+  "treasure": [
+    {
+      "id": "item.strionic_resonator",
+      "name": "Strionic Resonator",
+      "type": "artifact",
+      "description": "A tuning-fork relic entrusted to Katarina Brunn by the Church of Avacyn."
+    },
+    {
+      "id": "item.elbrus_hidden",
+      "name": "Elbrus, the Binding Blade",
+      "type": "cursed_blade",
+      "description": "A dangerous soul-hungry weapon hidden behind the guise of an innocent magic blade."
+    },
+    {
+      "id": "item.blessed_silver_weapon",
+      "name": "Blessed Silver Weapon",
+      "type": "weapon",
+      "description": "A silvered weapon forged by Marcus with help from someone who knows the rite."
+    }
+  ]
+}
+
