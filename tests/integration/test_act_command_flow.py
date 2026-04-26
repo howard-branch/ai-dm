@@ -34,7 +34,7 @@ class _StubDirector:
     def __init__(self):
         self.calls = []
 
-    def handle_player_input(self, text, *, scene_id=None, focus_npcs=None):
+    def handle_player_input(self, text, *, scene_id=None, focus_npcs=None, actor_id=None):
         self.calls.append({"text": text, "scene_id": scene_id})
         return SimpleNamespace(
             narration=f"You said: {text}",
@@ -69,6 +69,9 @@ def test_act_command_round_trip():
             "scene_id": "s-1", "text": "open the door",
         },
     })
+    # The dispatcher now offloads the turn to a worker thread to avoid
+    # deadlocking the WS recv loop. Wait for it to drain.
+    assert dispatcher.wait_idle(timeout=2.0)
 
     assert director.calls == [{"text": "open the door", "scene_id": "s-1"}]
     assert sessions.get("a-1").turn_count == 1

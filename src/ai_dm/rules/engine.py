@@ -28,7 +28,26 @@ from ai_dm.rules.conditions import (
     merge_advantage,
     target_mod,
 )
+from ai_dm.rules.damage import (
+    DamageOutcome,
+    apply_damage as _apply_damage,
+    apply_healing as _apply_healing,
+    grant_temp_hp as _grant_temp_hp,
+)
+from ai_dm.rules.death_saves import (
+    DeathSaveResult,
+    DeathSaveTrack,
+    damage_at_zero as _ds_damage_at_zero,
+    is_massive_damage,
+    roll_death_save as _roll_death_save,
+)
 from ai_dm.rules.dice import DiceRoller, RollResult
+from ai_dm.rules.exhaustion import (
+    add as _exh_add,
+    d20_penalty as _exh_d20_penalty,
+    is_dead as _exh_is_dead,
+    remove as _exh_remove,
+)
 from ai_dm.rules.house_rules import HouseRule, HouseRuleSet, load_house_rules
 from ai_dm.rules.skill_checks import CheckResult, make_check
 
@@ -47,11 +66,14 @@ class ActorRuleState:
     name: str = ""
     hp: int = 0
     max_hp: int = 0
+    temp_hp: int = 0
     ac: int = 10
     conditions: list[str] = None  # type: ignore[assignment]
     resistances: list[str] = None  # type: ignore[assignment]
     vulnerabilities: list[str] = None  # type: ignore[assignment]
     immunities: list[str] = None  # type: ignore[assignment]
+    exhaustion: int = 0
+    death_saves: DeathSaveTrack | None = None
 
     def __post_init__(self) -> None:
         if self.conditions is None:
@@ -62,6 +84,8 @@ class ActorRuleState:
             self.vulnerabilities = []
         if self.immunities is None:
             self.immunities = []
+        if self.death_saves is None:
+            self.death_saves = DeathSaveTrack()
 
 
 class RulesEngine:
@@ -116,7 +140,8 @@ class RulesEngine:
         advantage: str | None = None,
     ) -> CheckResult:
         adv = self._advantage_for(actor, target=None, override=advantage)
-        result = make_check(self.roller, modifier=modifier, dc=dc, advantage=adv)
+        eff_mod = int(modifier) + _exh_d20_penalty(getattr(actor, "exhaustion", 0))
+        result = make_check(self.roller, modifier=eff_mod, dc=dc, advantage=adv)
         self._publish(
             "rules.check_resolved",
             {"actor_id": actor.actor_id, "dc": dc, "result": result.to_dict()},
@@ -147,9 +172,12 @@ class RulesEngine:
         advantage: str | None = None,
     ) -> AttackResult:
         adv = self._advantage_for(attacker, target=target, override=advantage)
+        eff_mod = int(attack_modifier) + _exh_d20_penalty(
+            getattr(attacker, "exhaustion", 0)
+        )
         result = make_attack(
             self.roller,
-            attack_modifier=attack_modifier,
+            attack_modifier=eff_mod,
             target_ac=target.ac,
             advantage=adv,
         )
@@ -192,25 +220,97 @@ class RulesEngine:
         )
         return rolled
 
-    def apply_damage(self, target: ActorRuleState, amount: int) -> int:
+    def apply_damage(
+        self,
+        target: ActorRuleState,
+        amount: int,
+        *,
+        damage_type: str = "untyped",
+        crit: bool = False,
+    ) -> int:
+        """Apply ``amount`` damage to ``target``. Returns new HP.
+
+        * Soaks ``temp_hp`` first.
+        * If the target was already at 0 HP, registers a death-save
+          failure (two on a critical hit) and checks massive damage.
+        * If the hit drops the target to 0 HP, applies the unconscious
+          condition and checks massive damage (instant death).
+        """
         if amount <= 0:
             return target.hp
-        target.hp = max(0, target.hp - amount)
+        was_at_zero = target.hp == 0
+        outcome = _apply_damage(target, int(amount), damage_type=damage_type)
         self._publish(
             "rules.damage_applied",
-            {"target_id": target.actor_id, "amount": amount, "hp": target.hp},
+            {
+                "target_id": target.actor_id,
+                "amount": int(amount),
+                "damage_type": damage_type,
+                "outcome": outcome.to_dict(),
+            },
         )
-        if target.hp == 0 and "unconscious" not in target.conditions:
-            self.add_condition(target, "unconscious")
+        if was_at_zero:
+            _ds_damage_at_zero(target.death_saves, crit=bool(crit))  # type: ignore[arg-type]
+            if is_massive_damage(int(amount), target.max_hp):
+                target.death_saves.dead = True  # type: ignore[union-attr]
+        elif outcome.dropped_to_zero:
+            if "unconscious" not in target.conditions:
+                self.add_condition(target, "unconscious")
+            if is_massive_damage(outcome.dealt, target.max_hp):
+                target.death_saves.dead = True  # type: ignore[union-attr]
         return target.hp
 
     def heal(self, target: ActorRuleState, amount: int) -> int:
         if amount <= 0:
             return target.hp
-        target.hp = min(target.max_hp or amount, target.hp + amount)
-        if target.hp > 0 and "unconscious" in target.conditions:
+        was_at_zero = target.hp == 0
+        new_hp = _apply_healing(target, int(amount))
+        if new_hp > 0 and "unconscious" in target.conditions:
             self.remove_condition(target, "unconscious")
-        return target.hp
+        if was_at_zero and new_hp > 0 and target.death_saves is not None:
+            target.death_saves.reset()
+        return new_hp
+
+    def grant_temp_hp(self, target: ActorRuleState, amount: int) -> int:
+        return _grant_temp_hp(target, int(amount))
+
+    # ------------------------------------------------------------------ #
+    # Death saves & exhaustion
+    # ------------------------------------------------------------------ #
+
+    def death_save(self, actor: ActorRuleState) -> DeathSaveResult:
+        if actor.death_saves is None:
+            actor.death_saves = DeathSaveTrack()
+        result = _roll_death_save(actor.death_saves, self.roller)
+        if result.healed_to is not None:
+            actor.hp = max(actor.hp, int(result.healed_to))
+            if "unconscious" in actor.conditions:
+                self.remove_condition(actor, "unconscious")
+        self._publish(
+            "rules.death_save",
+            {"actor_id": actor.actor_id, "result": result.to_dict()},
+        )
+        return result
+
+    def add_exhaustion(self, actor: ActorRuleState, n: int = 1) -> int:
+        actor.exhaustion = _exh_add(actor.exhaustion, n)
+        if _exh_is_dead(actor.exhaustion):
+            actor.hp = 0
+            if actor.death_saves is not None:
+                actor.death_saves.dead = True
+        self._publish(
+            "rules.exhaustion_changed",
+            {"actor_id": actor.actor_id, "level": actor.exhaustion},
+        )
+        return actor.exhaustion
+
+    def remove_exhaustion(self, actor: ActorRuleState, n: int = 1) -> int:
+        actor.exhaustion = _exh_remove(actor.exhaustion, n)
+        self._publish(
+            "rules.exhaustion_changed",
+            {"actor_id": actor.actor_id, "level": actor.exhaustion},
+        )
+        return actor.exhaustion
 
     # ------------------------------------------------------------------ #
     # Conditions
@@ -264,6 +364,9 @@ class RulesEngine:
 __all__ = [
     "ActorRuleState",
     "RulesEngine",
+    "DeathSaveResult",
+    "DeathSaveTrack",
+    "DamageOutcome",
     "HouseRule",
     "HouseRuleSet",
 ]

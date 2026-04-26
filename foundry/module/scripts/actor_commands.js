@@ -43,7 +43,7 @@ function expandDotted(patch) {
 }
 
 export async function createActor(name, actorType = "npc", options = {}) {
-  const { system = null, img = null } = options || {};
+  const { system = null, img = null, items = [] } = options || {};
   const existing = game.actors?.find(
     (a) => (a.name || "").toLowerCase() === String(name).toLowerCase()
         && a.type === actorType
@@ -63,6 +63,9 @@ export async function createActor(name, actorType = "npc", options = {}) {
         console.warn("AI DM Bridge: failed to sync existing actor", name, err);
       }
     }
+    if (Array.isArray(items) && items.length > 0) {
+      await syncEmbeddedItems(existing, items);
+    }
     return existing;
   }
 
@@ -81,7 +84,38 @@ export async function createActor(name, actorType = "npc", options = {}) {
     throw new Error(`Failed to create actor: ${name}`);
   }
 
+  if (Array.isArray(items) && items.length > 0) {
+    try {
+      await actor.createEmbeddedDocuments("Item", items);
+    } catch (err) {
+      console.warn("AI DM Bridge: createEmbeddedDocuments failed for", name, err);
+    }
+  }
+
   return actor;
+}
+
+/**
+ * Idempotently push embedded Item docs onto an existing actor: skip
+ * any Item whose name + type already exists. Lets re-runs of bootstrap
+ * stay quiet instead of duplicating the inventory each restart.
+ */
+async function syncEmbeddedItems(actor, items) {
+  const existingKeys = new Set(
+    (actor.items?.contents || []).map(
+      (it) => `${(it.name || "").toLowerCase()}::${it.type}`
+    )
+  );
+  const fresh = items.filter((it) => {
+    const key = `${(it.name || "").toLowerCase()}::${it.type}`;
+    return !existingKeys.has(key);
+  });
+  if (fresh.length === 0) return;
+  try {
+    await actor.createEmbeddedDocuments("Item", fresh);
+  } catch (err) {
+    console.warn("AI DM Bridge: syncEmbeddedItems failed for", actor?.name, err);
+  }
 }
 
 export async function updateActor(actorId, patch) {

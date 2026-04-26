@@ -1,0 +1,15 @@
+{
+  "abilities": ["str", "dex", "con", "int", "wis", "cha"],
+  "labels": {
+    "str": "Strength",
+    "dex": "Dexterity",
+    "con": "Constitution",
+    "int": "Intelligence",
+    "wis": "Wisdom",
+    "cha": "Charisma"
+  },
+  "score_min": 1,
+  "score_max": 30,
+  "default_score": 10
+}
+

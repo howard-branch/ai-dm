@@ -1,0 +1,85 @@
+/* AI DM — persistent narration log window. */
+
+#ai-dm-narration-log {
+  display: flex;
+  flex-direction: column;
+}
+
+#ai-dm-narration-log .window-content {
+  padding: 0;
+  /* Light parchment theme so it's readable in both bright and dark
+     Foundry skins. The previous dark scheme was unreadable for users
+     on the default light UI. */
+  background: #f6efe0;
+  color: #1d1a14;
+  font-family: "Signika", "Segoe UI", sans-serif;
+  font-size: 18px;
+  line-height: 1.55;
+  overflow: hidden;
+}
+
+.ai-dm-narration-log-body {
+  padding: 0.8em 1em;
+  overflow-y: auto;
+  height: 100%;
+  max-height: 100%;
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: #b58e3a #e6dcc2;
+}
+
+.ai-dm-narration-log-body::-webkit-scrollbar { width: 12px; }
+.ai-dm-narration-log-body::-webkit-scrollbar-track { background: #e6dcc2; }
+.ai-dm-narration-log-body::-webkit-scrollbar-thumb {
+  background: #b58e3a;
+  border-radius: 6px;
+}
+
+.ai-dm-narration-log-empty {
+  color: #6a5b3a;
+  text-align: center;
+  padding: 2em 1em;
+  font-size: 16px;
+}
+
+.ai-dm-narration-log-entry {
+  border-bottom: 1px solid #d8c89a;
+  padding: 0.65em 0;
+  line-height: 1.55;
+  font-size: 18px;
+  color: #1d1a14;
+}
+.ai-dm-narration-log-entry:last-child { border-bottom: none; }
+
+.ai-dm-narration-log-ts {
+  color: #8a7340;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 13px;
+  margin-right: 0.4em;
+}
+
+.ai-dm-narration-log-entry strong {
+  color: #6a3d12;
+  font-weight: 700;
+}
+
+.ai-dm-narration-log-entry.ai-dm-kind-opening strong {
+  color: #1c4e8a;
+}
+
+.ai-dm-narration-log-body-html { display: inline; }
+.ai-dm-narration-log-body-html .ai-dm-narration { display: inline; }
+.ai-dm-narration-log-body-html .ai-dm-dialogue {
+  display: inline; font-style: italic; color: #2e2616;
+}
+.ai-dm-narration-log-body-html .ai-dm-error { color: #a02020; }
+.ai-dm-narration-log-body-html .ai-dm-scene-header {
+  display: block;
+  margin: 0.25em 0 0.35em 0;
+  color: #1c4e8a;
+  font-weight: 600;
+}
+
+/* Headings rendered inside the log (e.g. "**Your goal:**" markdown). */
+.ai-dm-narration-log-body-html strong { color: #6a3d12; }
+.ai-dm-narration-log-body-html em { color: #3a2f1c; }

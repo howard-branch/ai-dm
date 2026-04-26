@@ -47,3 +47,18 @@ def test_snapshot_round_trip():
     other.restore(svc.snapshot())
     assert other.resolve_anchor("s1", "altar") == (100, 200)
 
+
+def test_resolve_anywhere_finds_anchor_in_any_scene():
+    svc = LocationService()
+    svc.load_scene(_scene())
+    svc.load_scene(SceneLocation(
+        scene_id="s2",
+        anchors=[Anchor(id="a3", name="Well", scene_id="s2", x=42, y=99)],
+    ))
+    # Cross-scene name lookup ignores the caller's scene id (used as a
+    # fall-back when a Foundry scene id doesn't match the pack slug).
+    assert svc.resolve_anywhere("well") == ("s2", 42, 99)
+    assert svc.resolve_anywhere("ALTAR") == ("s1", 100, 200)
+    assert svc.resolve_anywhere("a3") == ("s2", 42, 99)
+    assert svc.resolve_anywhere("ghost") is None
+    assert svc.resolve_anywhere("") is None

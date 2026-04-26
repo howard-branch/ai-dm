@@ -145,3 +145,97 @@ def roll_d20() -> int:
 def roll(expression: str, *, advantage: Advantage = "normal") -> RollResult:
     """Convenience wrapper around the module roller."""
     return _DEFAULT_ROLLER.roll(expression, advantage=advantage)
+
+
+# --------------------------------------------------------------------- #
+# Advantage / disadvantage stacking and unified d20 test
+# --------------------------------------------------------------------- #
+
+
+def combine_advantage(adv_sources: int, dis_sources: int) -> Advantage:
+    """Combine N sources of advantage and M of disadvantage.
+
+    Per SRD: any of each cancels to ``"normal"``; otherwise pick the
+    side with at least one source.
+    """
+    a = max(0, int(adv_sources))
+    d = max(0, int(dis_sources))
+    if a > 0 and d > 0:
+        return "normal"
+    if a > 0:
+        return "advantage"
+    if d > 0:
+        return "disadvantage"
+    return "normal"
+
+
+@dataclass
+class D20Test:
+    """Result of a unified d20 test (check / save / attack)."""
+    roll: int               # the natural die kept after adv/dis
+    modifier: int
+    total: int
+    advantage: Advantage
+    crit: bool              # natural 20
+    fumble: bool            # natural 1
+    dc: int | None = None
+    target: int | None = None  # AC for attacks; same as ``dc`` for saves/checks
+    success: bool | None = None
+    raw: RollResult | None = None
+
+    def to_dict(self) -> dict:
+        return {
+            "roll": self.roll,
+            "modifier": self.modifier,
+            "total": self.total,
+            "advantage": self.advantage,
+            "crit": self.crit,
+            "fumble": self.fumble,
+            "dc": self.dc,
+            "target": self.target,
+            "success": self.success,
+        }
+
+
+def d20_test(
+    roller: DiceRoller,
+    *,
+    modifier: int = 0,
+    dc: int | None = None,
+    ac: int | None = None,
+    advantage: Advantage = "normal",
+    is_attack: bool = False,
+) -> D20Test:
+    """Unified d20 test: ability check, saving throw, or attack roll.
+
+    * If ``is_attack`` (or ``ac`` is given): nat 20 = auto-hit, nat 1 =
+      auto-miss; otherwise compare ``total`` vs ``ac``.
+    * Else compare ``total`` vs ``dc`` (no nat-20/1 auto for checks).
+    """
+    rr = roller.roll("1d20", advantage=advantage)
+    nat = int(rr.kept[0])
+    total = nat + int(modifier)
+    target = ac if ac is not None else dc
+    success: bool | None = None
+    if is_attack or ac is not None:
+        if rr.crit:
+            success = True
+        elif rr.fumble:
+            success = False
+        elif target is not None:
+            success = total >= target
+    elif dc is not None:
+        success = total >= dc
+    return D20Test(
+        roll=nat,
+        modifier=int(modifier),
+        total=total,
+        advantage=advantage,
+        crit=rr.crit,
+        fumble=rr.fumble,
+        dc=dc,
+        target=target,
+        success=success,
+        raw=rr,
+    )
+

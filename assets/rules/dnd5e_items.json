@@ -1,0 +1,218 @@
+{
+  "_doc": "Starter catalog of dnd5e items used by the character-creation wizard. Keys are stable slugs referenced by dnd5e_starting_kits.json and by player purchases. Prices in gp; weight in lb. Only fields meaningful to a given category are populated.",
+  "longsword": {
+    "name": "Longsword",
+    "type": "weapon",
+    "value_gp": 15,
+    "weight": 3.0,
+    "weapon_type": "martialM",
+    "properties": ["ver"],
+    "damage": {"parts": [["1d8", "slashing"]], "versatile": "1d10"},
+    "range": {"value": 5, "long": null, "units": "ft"},
+    "description": "A versatile martial blade — the standard sidearm of trained warriors."
+  },
+  "shortsword": {
+    "name": "Shortsword",
+    "type": "weapon",
+    "value_gp": 10,
+    "weight": 2.0,
+    "weapon_type": "martialM",
+    "properties": ["fin", "lgt"],
+    "damage": {"parts": [["1d6", "piercing"]]},
+    "range": {"value": 5, "units": "ft"},
+    "description": "A light, finesse blade favoured by duellists and rogues."
+  },
+  "dagger": {
+    "name": "Dagger",
+    "type": "weapon",
+    "value_gp": 2,
+    "weight": 1.0,
+    "weapon_type": "simpleM",
+    "properties": ["fin", "lgt", "thr"],
+    "damage": {"parts": [["1d4", "piercing"]]},
+    "range": {"value": 20, "long": 60, "units": "ft"},
+    "description": "Cheap, concealable, throwable."
+  },
+  "quarterstaff": {
+    "name": "Quarterstaff",
+    "type": "weapon",
+    "value_gp": 1,
+    "weight": 4.0,
+    "weapon_type": "simpleM",
+    "properties": ["ver"],
+    "damage": {"parts": [["1d6", "bludgeoning"]], "versatile": "1d8"},
+    "range": {"value": 5, "units": "ft"},
+    "description": "A length of hardwood — also a serviceable arcane focus."
+  },
+  "shortbow": {
+    "name": "Shortbow",
+    "type": "weapon",
+    "value_gp": 25,
+    "weight": 2.0,
+    "weapon_type": "simpleR",
+    "properties": ["amm", "two"],
+    "damage": {"parts": [["1d6", "piercing"]]},
+    "range": {"value": 80, "long": 320, "units": "ft"},
+    "description": "A simple ranged weapon."
+  },
+  "arrows_20": {
+    "name": "Arrows (20)",
+    "type": "ammo",
+    "qty_per_pack": 20,
+    "value_gp": 1,
+    "weight": 1.0,
+    "description": "A quiver of 20 arrows."
+  },
+  "leather_armor": {
+    "name": "Leather Armor",
+    "type": "armor",
+    "value_gp": 10,
+    "weight": 10.0,
+    "armor": {"type": "light", "value": 11, "dex": null},
+    "description": "Boiled and tooled hide. Light, quiet."
+  },
+  "chain_shirt": {
+    "name": "Chain Shirt",
+    "type": "armor",
+    "value_gp": 50,
+    "weight": 20.0,
+    "armor": {"type": "medium", "value": 13, "dex": 2},
+    "description": "Mail worn under a tunic — practical for adventurers."
+  },
+  "chain_mail": {
+    "name": "Chain Mail",
+    "type": "armor",
+    "value_gp": 75,
+    "weight": 55.0,
+    "armor": {"type": "heavy", "value": 16, "dex": 0},
+    "description": "Full mail with greaves and a coif."
+  },
+  "shield": {
+    "name": "Shield",
+    "type": "shield",
+    "value_gp": 10,
+    "weight": 6.0,
+    "ac_bonus": 2,
+    "description": "+2 AC while wielded."
+  },
+  "explorers_pack": {
+    "name": "Explorer's Pack",
+    "type": "pack",
+    "value_gp": 10,
+    "weight": 59.0,
+    "description": "Backpack, bedroll, mess kit, tinderbox, 10 torches, 10 days rations, waterskin, 50 ft hempen rope."
+  },
+  "dungeoneers_pack": {
+    "name": "Dungeoneer's Pack",
+    "type": "pack",
+    "value_gp": 12,
+    "weight": 61.5,
+    "description": "Backpack, crowbar, hammer, 10 pitons, 10 torches, tinderbox, 10 days rations, waterskin, 50 ft hempen rope."
+  },
+  "scholars_pack": {
+    "name": "Scholar's Pack",
+    "type": "pack",
+    "value_gp": 40,
+    "weight": 10.0,
+    "description": "Backpack, book of lore, ink, ink pen, 10 sheets of parchment, little bag of sand, small knife."
+  },
+  "burglars_pack": {
+    "name": "Burglar's Pack",
+    "type": "pack",
+    "value_gp": 16,
+    "weight": 47.0,
+    "description": "Backpack, ball bearings (1000), 10 ft string, bell, 5 candles, crowbar, hammer, 10 pitons, hooded lantern, 2 flasks of oil, 5 days rations, tinderbox, waterskin, 50 ft hempen rope."
+  },
+  "thieves_tools": {
+    "name": "Thieves' Tools",
+    "type": "tool",
+    "value_gp": 25,
+    "weight": 1.0,
+    "description": "Lockpicks and a small file. Required for picking locks and disarming traps."
+  },
+  "healers_kit": {
+    "name": "Healer's Kit",
+    "type": "consumable",
+    "value_gp": 5,
+    "weight": 3.0,
+    "description": "Ten uses; stabilises a dying creature without a check."
+  },
+  "potion_of_healing": {
+    "name": "Potion of Healing",
+    "type": "consumable",
+    "value_gp": 50,
+    "weight": 0.5,
+    "description": "Drink as an action: regain 2d4+2 HP."
+  },
+  "rope_hempen_50": {
+    "name": "Rope, Hempen (50 ft)",
+    "type": "gear",
+    "value_gp": 1,
+    "weight": 10.0,
+    "description": "50 feet of hempen rope."
+  },
+  "torch": {
+    "name": "Torch",
+    "type": "gear",
+    "value_gp": 1,
+    "weight": 1.0,
+    "description": "Burns for one hour, casting bright light in a 20-ft radius."
+  },
+  "rations_1": {
+    "name": "Rations (1 day)",
+    "type": "consumable",
+    "value_gp": 1,
+    "weight": 2.0,
+    "description": "Dry, packaged food sufficient for one person for one day."
+  },
+  "holy_symbol": {
+    "name": "Holy Symbol",
+    "type": "gear",
+    "value_gp": 5,
+    "weight": 1.0,
+    "description": "Amulet, emblem or reliquary — required as a divine focus."
+  },
+  "arcane_focus_orb": {
+    "name": "Arcane Focus (Orb)",
+    "type": "gear",
+    "value_gp": 20,
+    "weight": 3.0,
+    "description": "A polished crystal sphere — substitutes for material components without a cost."
+  },
+  "arcane_focus_wand": {
+    "name": "Arcane Focus (Wand)",
+    "type": "gear",
+    "value_gp": 10,
+    "weight": 1.0,
+    "description": "A slender length of yew. Substitutes for material components without a cost."
+  },
+  "spellbook": {
+    "name": "Spellbook",
+    "type": "gear",
+    "value_gp": 50,
+    "weight": 3.0,
+    "description": "A leather-bound tome of 100 blank vellum pages. Required by scholars / wizards."
+  },
+  "component_pouch": {
+    "name": "Component Pouch",
+    "type": "gear",
+    "value_gp": 25,
+    "weight": 2.0,
+    "description": "A small belt pouch of common spell components."
+  },
+  "lantern_hooded": {
+    "name": "Hooded Lantern",
+    "type": "gear",
+    "value_gp": 5,
+    "weight": 2.0,
+    "description": "Bright light in a 30-ft radius for 6 hours per flask of oil."
+  },
+  "oil_flask": {
+    "name": "Oil (flask)",
+    "type": "consumable",
+    "value_gp": 1,
+    "weight": 1.0,
+    "description": "One flask: lantern fuel for 6 hours, or improvised incendiary."
+  }
+}
+

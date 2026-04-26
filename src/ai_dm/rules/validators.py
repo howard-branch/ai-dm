@@ -5,12 +5,21 @@ from typing import Any
 
 _KNOWN_INTENT_TYPES = {
     "move",
+    "travel",
     "attack",
     "cast_spell",
     "skill_check",
     "interact",
     "speak",
     "use_item",
+    # Combat action menu.
+    "dash",
+    "disengage",
+    "dodge",
+    "help",
+    "hide",
+    "ready",
+    "end_turn",
     "query_world",
     "meta",
 }

@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from typing import Iterable, Protocol
 
+from ai_dm.app.opening_scene import build_scene_brief
+from ai_dm.campaign.pack import CampaignPack
 from ai_dm.game.location_service import LocationService
 from ai_dm.memory.npc_memory import NPCMemoryStore
 from ai_dm.memory.relationships import RelationshipMatrix
@@ -22,6 +24,7 @@ class PromptContextBuilder:
         story_planner=None,
         character: dict | None = None,
         party: list[dict] | None = None,
+        pack: CampaignPack | None = None,
     ) -> None:
         self.state_store = state_store
         self.npc_memory = npc_memory
@@ -35,6 +38,15 @@ class PromptContextBuilder:
         # is a compact dict {id, name, class, level, hp, role, controller}
         # — enough for the narrator to answer "who is in my party".
         self.party: list[dict] = list(party or [])
+        # Campaign pack — used to surface a per-turn scene brief
+        # (interactables, exits, NPCs) so the narrator can keep the
+        # player aware of their options on every turn, not just the
+        # opening narration.
+        self.pack = pack
+        # Last scene id we successfully built a brief for. Used as a
+        # fall-back when a turn arrives with a scene_id that doesn't
+        # resolve in the pack (e.g. Foundry's opaque id vs. our slug).
+        self._last_brief_scene: str | None = None
 
     def build(
         self,
@@ -75,6 +87,18 @@ class PromptContextBuilder:
             scene = self.location_service.get_scene(scene_id)
             if scene is not None:
                 context["scene_locations"] = scene.model_dump()
+
+        # Per-turn scene brief: interactables / exits / NPCs available
+        # right now. The narrator's system prompt instructs it to weave
+        # at least one of these into its prose so the player keeps a
+        # sense of available actions on every turn, not just at start.
+        if self.pack is not None:
+            brief = build_scene_brief(self.pack, scene_id)
+            if brief is None and self._last_brief_scene:
+                brief = build_scene_brief(self.pack, self._last_brief_scene)
+            if brief is not None:
+                context["scene_brief"] = brief
+                self._last_brief_scene = brief.get("scene_id") or self._last_brief_scene
 
         if self.story_planner is not None:
             try:

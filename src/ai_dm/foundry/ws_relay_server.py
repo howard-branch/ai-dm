@@ -18,6 +18,13 @@ logger = logging.getLogger("ai_dm.foundry.relay")
 class RelayState:
     python_clients: set[ServerConnection] = field(default_factory=set)
     foundry_clients: set[ServerConnection] = field(default_factory=set)
+    # Subset of foundry_clients whose hello declared is_gm=true. Used so
+    # Python can fail-fast when no GM browser is available to execute
+    # world-mutating commands.
+    foundry_gm_clients: set[ServerConnection] = field(default_factory=set)
+    # Per-client metadata captured from hello (user_name, is_gm). Keyed
+    # by websocket so we can include it in the `who` census.
+    client_meta: dict[ServerConnection, dict[str, Any]] = field(default_factory=dict)
 
 
 class FoundryRelayServer:
@@ -27,6 +34,7 @@ class FoundryRelayServer:
         port: int = 8765,
         *,
         seen_id_lru_size: int = 1024,
+        send_timeout: float = 2.0,
     ) -> None:
         self.host = host
         self.port = port
@@ -36,6 +44,10 @@ class FoundryRelayServer:
         self._seen_results: OrderedDict[str, None] = OrderedDict()
         self._seen_events: OrderedDict[str, None] = OrderedDict()
         self._lru_size = seen_id_lru_size
+        # Per-client send timeout used by ``_broadcast``. A stuck client
+        # is dropped after this many seconds rather than blocking every
+        # other message in the event loop.
+        self._send_timeout = send_timeout
 
     async def run(self) -> None:
         async with serve(self._handler, self.host, self.port):
@@ -61,6 +73,8 @@ class FoundryRelayServer:
                 self.state.python_clients.add(websocket)
             elif client_type == "foundry":
                 self.state.foundry_clients.add(websocket)
+                if bool(msg.get("is_gm")):
+                    self.state.foundry_gm_clients.add(websocket)
             else:
                 await websocket.send(json.dumps({
                     "type": "error",
@@ -68,15 +82,27 @@ class FoundryRelayServer:
                 }))
                 return
 
+            self.state.client_meta[websocket] = {
+                "type": client_type,
+                "user_name": msg.get("user_name"),
+                "user_id": msg.get("user_id"),
+                "is_gm": bool(msg.get("is_gm")),
+            }
+
             logger.info(
-                "client connected: type=%s peer=%s (python=%d foundry=%d)",
-                client_type, peer,
-                len(self.state.python_clients), len(self.state.foundry_clients),
+                "client connected: type=%s user=%s is_gm=%s peer=%s "
+                "(python=%d foundry=%d gm=%d)",
+                client_type, msg.get("user_name"), bool(msg.get("is_gm")), peer,
+                len(self.state.python_clients),
+                len(self.state.foundry_clients),
+                len(self.state.foundry_gm_clients),
             )
 
             await websocket.send(json.dumps({
                 "type": "hello_ack",
                 "client": client_type,
+                "foundry_count": len(self.state.foundry_clients),
+                "foundry_gm_count": len(self.state.foundry_gm_clients),
             }))
 
             async for raw in websocket:
@@ -89,11 +115,16 @@ class FoundryRelayServer:
                 self.state.python_clients.discard(websocket)
             elif client_type == "foundry":
                 self.state.foundry_clients.discard(websocket)
+                self.state.foundry_gm_clients.discard(websocket)
+            self.state.client_meta.pop(websocket, None)
             if client_type is not None:
                 logger.info(
-                    "client disconnected: type=%s peer=%s (python=%d foundry=%d)",
+                    "client disconnected: type=%s peer=%s "
+                    "(python=%d foundry=%d gm=%d)",
                     client_type, peer,
-                    len(self.state.python_clients), len(self.state.foundry_clients),
+                    len(self.state.python_clients),
+                    len(self.state.foundry_clients),
+                    len(self.state.foundry_gm_clients),
                 )
 
     async def _handle_message(
@@ -115,6 +146,27 @@ class FoundryRelayServer:
 
         if msg_type == "ping":
             await websocket.send(json.dumps({"type": "pong"}))
+            return
+
+        if msg_type == "who":
+            # Census query: how many clients of each type are connected,
+            # and which Foundry users (with isGM flag). Used by Python
+            # to fail-fast at startup when no GM browser is available.
+            await websocket.send(json.dumps({
+                "type": "who_ack",
+                "python_count": len(self.state.python_clients),
+                "foundry_count": len(self.state.foundry_clients),
+                "foundry_gm_count": len(self.state.foundry_gm_clients),
+                "foundry_clients": [
+                    {
+                        "user_name": meta.get("user_name"),
+                        "user_id": meta.get("user_id"),
+                        "is_gm": meta.get("is_gm"),
+                    }
+                    for ws, meta in self.state.client_meta.items()
+                    if meta.get("type") == "foundry"
+                ],
+            }))
             return
 
         if client_type == "python" and msg_type in ("command", "batch"):
@@ -180,6 +232,13 @@ class FoundryRelayServer:
             if client_type == "foundry":
                 await self._broadcast_to_python(forward)
             else:
+                # Broadcast to every connected Foundry client. The JS
+                # side performs an in-browser election (prefer the GM,
+                # otherwise the lowest user id) so exactly one client
+                # creates the ChatMessage; Foundry's own server then
+                # replicates that message to every other tab. We do
+                # NOT GM-route here at the relay because a player-only
+                # session would otherwise see no narration at all.
                 await self._broadcast_to_foundry(forward)
             return
 
@@ -214,17 +273,51 @@ class FoundryRelayServer:
             clients: set[ServerConnection],
             payload: dict[str, Any],
     ) -> None:
+        """Send ``payload`` to every client concurrently with a per-client
+        timeout. Any client whose send hangs longer than
+        ``_send_timeout`` seconds is considered wedged and dropped — a
+        single stuck Foundry tab (paused background tab, OS-level
+        throttling, etc.) used to block the whole event loop, which
+        broke ``who()`` *and* every subsequent command.
+        """
+        if not clients:
+            return
         text = json.dumps(payload)
-        dead: list[ServerConnection] = []
+        # Snapshot — clients may be mutated mid-iteration.
+        targets = list(clients)
 
-        for client in clients:
+        async def _send_one(client: ServerConnection) -> ServerConnection | None:
             try:
-                await client.send(text)
-            except Exception:
-                dead.append(client)
+                await asyncio.wait_for(client.send(text), timeout=self._send_timeout)
+                return None
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "relay: dropping wedged client (send timeout %.1fs) — "
+                    "peer=%s meta=%s",
+                    self._send_timeout,
+                    getattr(client, "remote_address", None),
+                    self.state.client_meta.get(client),
+                )
+                return client
+            except Exception as exc:  # noqa: BLE001
+                logger.info("relay: dropping client after send error: %s", exc)
+                return client
 
-        for client in dead:
-            clients.discard(client)
+        results = await asyncio.gather(
+            *(_send_one(c) for c in targets),
+            return_exceptions=False,
+        )
+        for dead in results:
+            if dead is not None:
+                clients.discard(dead)
+                self.state.python_clients.discard(dead)
+                self.state.foundry_clients.discard(dead)
+                self.state.foundry_gm_clients.discard(dead)
+                self.state.client_meta.pop(dead, None)
+                try:
+                    await dead.close()
+                except Exception:  # noqa: BLE001
+                    pass
 
 
 async def main() -> None:

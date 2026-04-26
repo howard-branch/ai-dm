@@ -10,6 +10,25 @@ _DEFAULT_SYSTEM_PROMPT = (
     " outside of the JSON object."
 )
 
+# Always-on guidance appended to whatever system prompt is in use. Keeps
+# the player aware of available actions on every turn (not just the
+# scripted opening): if the context contains a `scene_brief`, the
+# narrator must weave at least one or two of its `interactables` or
+# `exits` into the prose so the player can tell concrete affordances
+# apart from atmosphere.
+_AFFORDANCE_GUIDANCE = (
+    "When the context contains a `scene_brief`, mention by name at least"
+    " one interactable or exit from it inside the `narration` field"
+    " (e.g. \"the iron-bound door\" or \"Old Beren\"), so the player"
+    " always has a concrete sense of what they can act on. Do not invent"
+    " interactables that are not listed in `scene_brief` or implied by"
+    " the world state — only authored entries are real."
+    "\n\nNever read internal identifiers aloud. Fields named `id`,"
+    " `actor_id`, `user_id`, `token_id`, `scene_id` and any opaque"
+    " hash-like value (e.g. `aB7xQ2pM9KvLnR4t`) exist only for the"
+    " engine. Refer to characters and places by their `name`."
+)
+
 
 def build_narrator_prompt(
     player_input: str,
@@ -19,6 +38,10 @@ def build_narrator_prompt(
     schema_path: Path | None = None,
 ) -> str:
     system = _read_text(system_path) or _DEFAULT_SYSTEM_PROMPT
+    # Append the always-on affordance guidance so authored system
+    # prompts also benefit (the file-on-disk prompt usually focuses on
+    # tone/voice and forgets to mention scene_brief).
+    system = system.rstrip() + "\n\n" + _AFFORDANCE_GUIDANCE
     schema_section = ""
     if schema_path and schema_path.exists():
         schema_section = (

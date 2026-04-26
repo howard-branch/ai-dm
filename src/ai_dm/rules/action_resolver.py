@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from ai_dm.rules.engine import ActorRuleState, RulesEngine
+from ai_dm.rules.targeting import TargetSpec, resolve_targets
 
 logger = logging.getLogger("ai_dm.rules.resolver")
 
@@ -42,6 +43,16 @@ class ActionResolution:
 ActorLookup = Callable[[str], "ActorRuleState | None"]
 
 
+def _set_attr(actor: Any, name: str, value: Any) -> None:
+    """Best-effort attribute assignment for duck-typed actor objects."""
+    if actor is None:
+        return
+    try:
+        setattr(actor, name, value)
+    except Exception:  # noqa: BLE001 — frozen dataclass / unsupported attr
+        pass
+
+
 class ActionResolver:
     """Bridges intents to the rules engine."""
 
@@ -50,9 +61,11 @@ class ActionResolver:
         *,
         rules: RulesEngine | None = None,
         actor_lookup: ActorLookup | None = None,
+        spell_catalog: dict[str, dict[str, Any]] | None = None,
     ) -> None:
         self.rules = rules
         self.actor_lookup = actor_lookup
+        self.spell_catalog = spell_catalog or {}
 
     def resolve(self, intent: Any, ctx: dict | None = None) -> Any:
         if isinstance(intent, str):
@@ -72,7 +85,25 @@ class ActionResolver:
             return self._resolve_check(intent)
         if kind == "attack":
             return self._resolve_attack(intent, ctx)
-        if kind in ("move", "interact", "speak", "use_item", "query_world", "meta"):
+        if kind == "cast_spell":
+            return self._resolve_cast_spell(intent, ctx)
+        if kind == "dash":
+            return self._resolve_dash(intent)
+        if kind == "disengage":
+            return self._resolve_disengage(intent)
+        if kind == "dodge":
+            return self._resolve_dodge(intent)
+        if kind == "help":
+            return self._resolve_help(intent)
+        if kind == "hide":
+            return self._resolve_hide(intent, ctx)
+        if kind == "ready":
+            return self._resolve_ready(intent, ctx)
+        if kind == "use_item":
+            return self._resolve_use_item(intent, ctx)
+        if kind == "end_turn":
+            return self._resolve_end_turn(intent)
+        if kind in ("move", "interact", "speak", "query_world", "meta"):
             return ActionResolution(
                 type=kind,
                 actor_id=getattr(intent, "actor_id", None),
@@ -136,6 +167,9 @@ class ActionResolver:
             damage_total = dmg.total
             damage_details = dmg.to_dict()
             self.rules.apply_damage(target, dmg.total)
+        # An attack consumes the actor's action and breaks stealth.
+        self._consume_economy(attacker, action=True)
+        _set_attr(attacker, "hidden", False)
         return ActionResolution(
             type="attack",
             actor_id=actor_id,
@@ -153,6 +187,356 @@ class ActionResolver:
                 "target_hp": target.hp,
             },
         )
+
+    # ------------------------------------------------------------------ #
+    # Combat action menu (5e SRD)
+    # ------------------------------------------------------------------ #
+
+    def _resolve_cast_spell(self, intent: Any, ctx: dict) -> ActionResolution:
+        """Resolve a ``cast_spell`` intent.
+
+        The bookkeeping done here is intentionally narrow: spend the
+        slot, charge the right slice of the action economy, and (if
+        requested) start concentration. Mechanical effects (attack
+        rolls, save DCs) are layered on top by the caller via ``ctx``
+        keys mirroring :meth:`_resolve_attack`.
+        """
+        actor_id = getattr(intent, "actor_id", None) or "player"
+        actor = self._lookup(actor_id)
+        spell = (
+            getattr(intent, "spell", None)
+            or ctx.get("spell")
+            or ctx.get("spell_id")
+        )
+        level = int(ctx.get("level", 0) or 0)
+        casting_time = str(ctx.get("casting_time", "action")).lower()
+        concentrates = bool(ctx.get("concentration", False))
+
+        # ---- targeting resolution ------------------------------------ #
+        # Build a TargetSpec from the catalog when one is wired, else
+        # fall back to a permissive single-target spec inferred from
+        # ctx — this keeps callers that don't care about targeting (and
+        # the legacy combat-action-menu tests) working unchanged.
+        spec_override = ctx.get("target_spec")
+        if isinstance(spec_override, TargetSpec):
+            spec = spec_override
+        elif isinstance(spec_override, dict):
+            spec = TargetSpec.from_catalog({"targeting": spec_override})
+        else:
+            record = self.spell_catalog.get(str(spell)) if spell else None
+            spec = TargetSpec.from_catalog(record) if record else None
+
+        details: dict[str, Any] = {
+            "spell": spell,
+            "level": level,
+            "casting_time": casting_time,
+            "concentration": concentrates,
+        }
+
+        resolved = None
+        if spec is not None:
+            resolved = resolve_targets(
+                spec,
+                intent=intent,
+                ctx=ctx,
+                actor=actor,
+                actor_lookup=self.actor_lookup,
+            )
+            details["targeting"] = resolved.to_dict()
+            if not resolved.success:
+                return ActionResolution(
+                    type="cast_spell", actor_id=actor_id,
+                    target_id=getattr(intent, "target_id", None),
+                    success=False,
+                    summary=f"cannot cast {spell or 'spell'}: {resolved.error}",
+                    details=details,
+                )
+
+        # Spell-slot accounting (cantrips / level 0 are free).
+        slot_spent = True
+        if level > 0 and actor is not None and hasattr(actor, "spend_slot"):
+            slot_spent = bool(actor.spend_slot(level))
+            details["slot_spent"] = slot_spent
+            if not slot_spent:
+                return ActionResolution(
+                    type="cast_spell", actor_id=actor_id,
+                    success=False,
+                    summary=f"no level-{level} slot available",
+                    details=details,
+                )
+
+        # Action economy: bonus action / action / reaction.
+        if casting_time == "bonus":
+            ok = self._consume_economy(actor, bonus_action=True)
+        elif casting_time == "reaction":
+            ok = self._consume_economy(actor, reaction=True)
+        else:
+            ok = self._consume_economy(actor, action=True)
+        if not ok:
+            return ActionResolution(
+                type="cast_spell", actor_id=actor_id, success=False,
+                summary=f"cannot cast: {casting_time} already spent",
+                details=details,
+            )
+
+        # Concentration (replaces any active concentration spell).
+        if concentrates and actor is not None:
+            try:
+                from ai_dm.game.combatant_state import Concentration
+                actor.concentration = Concentration(  # type: ignore[attr-defined]
+                    spell_id=str(spell or "unknown"),
+                    name=str(spell or "unknown"),
+                    target_ids=list(resolved.actor_ids) if resolved else [],
+                )
+            except Exception:  # noqa: BLE001 — duck-typed actor without concentration
+                pass
+
+        # Casting breaks stealth.
+        _set_attr(actor, "hidden", False)
+
+        if resolved is not None:
+            details["targets"] = list(resolved.actor_ids)
+
+        return ActionResolution(
+            type="cast_spell", actor_id=actor_id,
+            target_id=getattr(intent, "target_id", None),
+            success=True,
+            summary=f"casts {spell or 'a spell'}"
+                    + (f" at level {level}" if level > 0 else "")
+                    + (" (concentration)" if concentrates else ""),
+            details=details,
+        )
+
+    def _resolve_dash(self, intent: Any) -> ActionResolution:
+        actor_id = getattr(intent, "actor_id", None) or "player"
+        actor = self._lookup(actor_id)
+        if not self._consume_economy(actor, action=True):
+            return ActionResolution(
+                type="dash", actor_id=actor_id, success=False,
+                summary="action already spent",
+            )
+        _set_attr(actor, "dashed", True)
+        speed = int(getattr(actor, "speed", 30) or 30)
+        return ActionResolution(
+            type="dash", actor_id=actor_id, success=True,
+            summary=f"dashes (speed +{speed} this turn)",
+            details={"bonus_movement": speed},
+        )
+
+    def _resolve_disengage(self, intent: Any) -> ActionResolution:
+        actor_id = getattr(intent, "actor_id", None) or "player"
+        actor = self._lookup(actor_id)
+        if not self._consume_economy(actor, action=True):
+            return ActionResolution(
+                type="disengage", actor_id=actor_id, success=False,
+                summary="action already spent",
+            )
+        _set_attr(actor, "disengaging", True)
+        return ActionResolution(
+            type="disengage", actor_id=actor_id, success=True,
+            summary="disengages — no opportunity attacks this turn",
+        )
+
+    def _resolve_dodge(self, intent: Any) -> ActionResolution:
+        actor_id = getattr(intent, "actor_id", None) or "player"
+        actor = self._lookup(actor_id)
+        if not self._consume_economy(actor, action=True):
+            return ActionResolution(
+                type="dodge", actor_id=actor_id, success=False,
+                summary="action already spent",
+            )
+        _set_attr(actor, "dodging", True)
+        return ActionResolution(
+            type="dodge", actor_id=actor_id, success=True,
+            summary="dodges — attacks against them have disadvantage",
+        )
+
+    def _resolve_help(self, intent: Any) -> ActionResolution:
+        actor_id = getattr(intent, "actor_id", None) or "player"
+        target_id = getattr(intent, "target_id", None)
+        if not target_id:
+            return ActionResolution(
+                type="help", actor_id=actor_id, success=False,
+                summary="help requires a target",
+            )
+        actor = self._lookup(actor_id)
+        if not self._consume_economy(actor, action=True):
+            return ActionResolution(
+                type="help", actor_id=actor_id, success=False,
+                summary="action already spent",
+            )
+        _set_attr(actor, "helping_target", target_id)
+        return ActionResolution(
+            type="help", actor_id=actor_id, target_id=target_id, success=True,
+            summary=f"helps {target_id} (advantage on next check/attack)",
+        )
+
+    def _resolve_hide(self, intent: Any, ctx: dict) -> ActionResolution:
+        """Hide as an action — optionally rolled vs. a passive Perception DC.
+
+        ``ctx`` may carry ``stealth_modifier`` (int) and ``dc`` (int).
+        Without a rules engine we record the intent and mark the actor
+        hidden optimistically.
+        """
+        actor_id = getattr(intent, "actor_id", None) or "player"
+        actor = self._lookup(actor_id)
+        if not self._consume_economy(actor, action=True):
+            return ActionResolution(
+                type="hide", actor_id=actor_id, success=False,
+                summary="action already spent",
+            )
+
+        success = True
+        details: dict[str, Any] = {}
+        if self.rules is not None and "dc" in ctx:
+            stealth_mod = int(ctx.get("stealth_modifier", 0))
+            dc = int(ctx.get("dc", 10))
+            rule_actor = ActorRuleState(actor_id=actor_id, name=actor_id)
+            check = self.rules.ability_check(rule_actor, modifier=stealth_mod, dc=dc)
+            success = check.success
+            details["check"] = check.to_dict()
+
+        if success:
+            _set_attr(actor, "hidden", True)
+        return ActionResolution(
+            type="hide", actor_id=actor_id, success=success,
+            summary="hides successfully" if success else "fails to hide",
+            details=details,
+        )
+
+    def _resolve_ready(self, intent: Any, ctx: dict) -> ActionResolution:
+        """Ready an action: reserves both your action and your reaction.
+
+        ``ctx`` describes the trigger and the deferred sub-action:
+            {
+              "trigger": "when the goblin steps through the door",
+              "action": "attack",  # or "cast_spell" / "use_item" / ...
+              "payload": { ... },  # forwarded when the trigger fires
+              "spell_level": 1,    # optional — slot reserved at this level
+            }
+        Per RAW, a readied spell consumes its slot immediately and
+        requires concentration until released; we mirror that here.
+        """
+        actor_id = getattr(intent, "actor_id", None) or "player"
+        actor = self._lookup(actor_id)
+        trigger = str(ctx.get("trigger") or getattr(intent, "notes", "") or "")
+        sub_action = str(ctx.get("action") or "attack")
+        payload = dict(ctx.get("payload") or {})
+        spell_level = ctx.get("spell_level")
+
+        if not self._consume_economy(actor, action=True):
+            return ActionResolution(
+                type="ready", actor_id=actor_id, success=False,
+                summary="action already spent",
+            )
+        if not self._consume_economy(actor, reaction=True):
+            # Roll back the action so the caller can retry next turn.
+            _set_attr(actor, "action_used", False)
+            return ActionResolution(
+                type="ready", actor_id=actor_id, success=False,
+                summary="reaction already spent",
+            )
+
+        # Readied spells: pre-spend the slot.
+        if (
+            sub_action == "cast_spell"
+            and spell_level is not None
+            and actor is not None
+            and hasattr(actor, "spend_slot")
+        ):
+            if not actor.spend_slot(int(spell_level)):
+                return ActionResolution(
+                    type="ready", actor_id=actor_id, success=False,
+                    summary=f"no level-{spell_level} slot to ready",
+                )
+
+        readied = {
+            "trigger": trigger,
+            "action": sub_action,
+            "payload": payload,
+            "spell_level": spell_level,
+        }
+        _set_attr(actor, "readied_action", readied)
+        return ActionResolution(
+            type="ready", actor_id=actor_id, success=True,
+            summary=f"readies {sub_action}: {trigger or '(no trigger specified)'}",
+            details=readied,
+        )
+
+    def _resolve_use_item(self, intent: Any, ctx: dict) -> ActionResolution:
+        """Use an item.
+
+        By default this consumes the actor's action; pass
+        ``ctx={"economy": "bonus" | "free"}`` for items that don't.
+        """
+        actor_id = getattr(intent, "actor_id", None) or "player"
+        actor = self._lookup(actor_id)
+        item = (
+            getattr(intent, "target_id", None)
+            or ctx.get("item")
+            or "item"
+        )
+        economy = str(ctx.get("economy", "action")).lower()
+        if economy == "bonus":
+            ok = self._consume_economy(actor, bonus_action=True)
+        elif economy == "free":
+            ok = True
+        else:
+            ok = self._consume_economy(actor, action=True)
+        if not ok:
+            return ActionResolution(
+                type="use_item", actor_id=actor_id, success=False,
+                summary=f"cannot use {item}: {economy} already spent",
+            )
+        return ActionResolution(
+            type="use_item", actor_id=actor_id, target_id=str(item),
+            success=True,
+            summary=f"uses {item}",
+            details={"item": item, "economy": economy},
+        )
+
+    def _resolve_end_turn(self, intent: Any) -> ActionResolution:
+        """End the actor's turn explicitly. No mechanical state changes
+        — turn cleanup happens in :class:`CombatMachine.end_turn`."""
+        actor_id = getattr(intent, "actor_id", None) or "player"
+        return ActionResolution(
+            type="end_turn", actor_id=actor_id, success=True,
+            summary=f"{actor_id} ends their turn",
+        )
+
+    # ------------------------------------------------------------------ #
+    # Action-economy helpers
+    # ------------------------------------------------------------------ #
+
+    def _consume_economy(
+        self,
+        actor: Any,
+        *,
+        action: bool = False,
+        bonus_action: bool = False,
+        reaction: bool = False,
+    ) -> bool:
+        """Mark the requested action-economy slice as spent.
+
+        Returns ``False`` if the slice was already spent on this turn.
+        Silently no-ops when ``actor`` is ``None`` or lacks the
+        relevant attribute (legacy ``ActorRuleState`` callers).
+        """
+        if actor is None:
+            return True
+        if action and getattr(actor, "action_used", False):
+            return False
+        if bonus_action and getattr(actor, "bonus_action_used", False):
+            return False
+        if reaction and getattr(actor, "reaction_used", False):
+            return False
+        if action and hasattr(actor, "action_used"):
+            actor.action_used = True
+        if bonus_action and hasattr(actor, "bonus_action_used"):
+            actor.bonus_action_used = True
+        if reaction and hasattr(actor, "reaction_used"):
+            actor.reaction_used = True
+        return True
 
     def _lookup(self, actor_id: str) -> ActorRuleState | None:
         if self.actor_lookup is None:

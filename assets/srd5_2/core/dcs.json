@@ -1,0 +1,13 @@
+{
+  "named": {
+    "very_easy": 5,
+    "easy": 10,
+    "medium": 15,
+    "hard": 20,
+    "very_hard": 25,
+    "nearly_impossible": 30
+  },
+  "spell_save_dc_formula": "8 + proficiency_bonus + spellcasting_ability_mod",
+  "spell_attack_bonus_formula": "proficiency_bonus + spellcasting_ability_mod"
+}
+

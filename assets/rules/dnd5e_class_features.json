@@ -1,0 +1,116 @@
+{
+  "_doc": "Per-archetype level-1 class features (structured for the dnd5e `feat` Item type). Plus a parallel `_backgrounds` map for background-derived perks. Loaded by ai_dm.app.character_features.",
+  "warrior": [
+    {
+      "id": "second_wind",
+      "name": "Second Wind",
+      "type": "feat",
+      "activation": {"type": "bonus", "cost": 1},
+      "uses": {"value": 1, "max": 1, "per": "sr"},
+      "description": "Once per short rest, regain 1d10 + your level HP as a bonus action."
+    },
+    {
+      "id": "fighting_style_defense",
+      "name": "Fighting Style: Defense",
+      "type": "feat",
+      "activation": {"type": "passive", "cost": 0},
+      "description": "+1 AC while wearing armour."
+    }
+  ],
+  "rogue": [
+    {
+      "id": "sneak_attack",
+      "name": "Sneak Attack 1d6",
+      "type": "feat",
+      "activation": {"type": "passive", "cost": 0},
+      "description": "Once per turn, +1d6 damage to a creature you have advantage on, or that has an enemy of yours within 5 ft."
+    },
+    {
+      "id": "thieves_cant",
+      "name": "Thieves' Cant",
+      "type": "feat",
+      "activation": {"type": "passive", "cost": 0},
+      "description": "A secret mix of dialect, jargon, and code letting you hide messages in plain speech."
+    }
+  ],
+  "witch": [
+    {
+      "id": "hex_mark",
+      "name": "Hex Mark",
+      "type": "feat",
+      "activation": {"type": "passive", "cost": 0},
+      "description": "You bear a witch-mark that aches in the presence of malign spirits."
+    },
+    {
+      "id": "old_pact",
+      "name": "Old Pact",
+      "type": "feat",
+      "activation": {"type": "passive", "cost": 0},
+      "description": "A patron in the unseen realm grants your magic — and asks favours in return."
+    }
+  ],
+  "scholar": [
+    {
+      "id": "ritual_caster",
+      "name": "Ritual Caster",
+      "type": "feat",
+      "activation": {"type": "passive", "cost": 0},
+      "description": "You may cast any spell in your spellbook with the ritual tag without expending a slot (10 minutes longer)."
+    },
+    {
+      "id": "expertise_lore",
+      "name": "Expertise: Lore",
+      "type": "feat",
+      "activation": {"type": "passive", "cost": 0},
+      "description": "Double your proficiency bonus on Arcana, History, and Religion checks."
+    }
+  ],
+  "_backgrounds": {
+    "exiled_noble": [
+      {
+        "id": "position_of_privilege",
+        "name": "Position of Privilege",
+        "type": "feat",
+        "activation": {"type": "passive", "cost": 0},
+        "description": "Even in exile, your bearing opens doors that bar commoners."
+      }
+    ],
+    "forbidden_scholar": [
+      {
+        "id": "researchers_eye",
+        "name": "Researcher's Eye",
+        "type": "feat",
+        "activation": {"type": "passive", "cost": 0},
+        "description": "When you don't know a fact, you usually know who to ask."
+      }
+    ],
+    "wandering_mage": [
+      {
+        "id": "wayfarer",
+        "name": "Wayfarer",
+        "type": "feat",
+        "activation": {"type": "passive", "cost": 0},
+        "description": "You always know which way is north and how long until dawn."
+      }
+    ],
+    "hedge_witch": [
+      {
+        "id": "village_remedy",
+        "name": "Village Remedy",
+        "type": "feat",
+        "activation": {"type": "passive", "cost": 0},
+        "description": "Given an hour and local plants, you can brew a poultice that grants advantage on the next death save."
+      }
+    ],
+    "sellsword": [
+      {
+        "id": "guild_contacts",
+        "name": "Guild Contacts",
+        "type": "feat",
+        "activation": {"type": "passive", "cost": 0},
+        "description": "A network of mercenaries — there's usually somebody in any town who owes you a drink."
+      }
+    ]
+  }
+}
+

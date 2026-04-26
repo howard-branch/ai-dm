@@ -22,6 +22,8 @@ from ai_dm.foundry.registry import FoundryRegistry
 from ai_dm.models.commands import (
     ActivateSceneCommand,
     CreateActorCommand,
+    CreateJournalCommand,
+    CreateNoteCommand,
     CreateSceneCommand,
     DeleteActorCommand,
     DeleteSceneCommand,
@@ -29,11 +31,13 @@ from ai_dm.models.commands import (
     GameCommand,
     HighlightObjectCommand,
     MoveTokenCommand,
+    MoveActorToCommand,
     ReadActiveSceneCommand,
     ReadActorCommand,
     ReadTokenCommand,
     SpawnTokenCommand,
     UpdateActorCommand,
+    UpdateJournalCommand,
 )
 
 DEFAULT_ACTOR_PATCH_ALLOW: tuple[str, ...] = (
@@ -103,6 +107,30 @@ class CommandValidator:
                     command_type=cmd.type,
                 ) from exc
             self._check_coords(cmd.x, cmd.y, command_type=cmd.type)
+            return
+
+        if isinstance(cmd, MoveActorToCommand):
+            # Best-effort actor resolution: if we know the actor, swap to
+            # its Foundry id; otherwise let Foundry try (it can match by
+            # name or id at the canvas layer).
+            try:
+                cmd.actor_id = self.registry.resolve("actor", cmd.actor_id)
+            except RegistryMissError:
+                pass
+            if cmd.scene_id:
+                try:
+                    cmd.scene_id = self.registry.resolve("scene", cmd.scene_id)
+                except RegistryMissError:
+                    pass
+            if cmd.x is not None and cmd.y is not None:
+                self._check_coords(cmd.x, cmd.y, command_type=cmd.type)
+            elif not cmd.target and not cmd.target_id:
+                raise ValidationError(
+                    "move_actor_to requires `target`, `target_id`, or x/y",
+                    code="missing_target",
+                    field="target",
+                    command_type=cmd.type,
+                )
             return
 
         if isinstance(cmd, ActivateSceneCommand):
@@ -192,6 +220,19 @@ class CommandValidator:
                     field="patch",
                     command_type=cmd.type,
                 )
+            return
+
+        if isinstance(cmd, CreateNoteCommand):
+            self._require_nonempty(cmd.text, "text", cmd.type)
+            # scene_id is optional (defaults to active scene on JS side);
+            # only resolve if provided so this works during startup
+            # before the registry has an entry for the auto-created scene.
+            if cmd.scene_id:
+                try:
+                    cmd.scene_id = self.registry.resolve("scene", cmd.scene_id)
+                except RegistryMissError:
+                    pass  # let JS resolve by name
+            self._check_coords(cmd.x, cmd.y, command_type=cmd.type)
             return
 
     # ------------------------------------------------------------------ #

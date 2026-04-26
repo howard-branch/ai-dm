@@ -1,0 +1,89 @@
+/* AI DM — sticky lobby window. Same readable parchment palette as the
+   narration log so a GM looking at one is comfortable with both. */
+
+#ai-dm-lobby .window-content {
+  padding: 0;
+  background: #f6efe0;
+  color: #1d1a14;
+  font-family: "Signika", "Segoe UI", sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.ai-dm-lobby-body {
+  padding: 0.9em 1.1em 1.1em 1.1em;
+  box-sizing: border-box;
+}
+
+.ai-dm-lobby-empty {
+  color: #6a5b3a;
+  text-align: center;
+  padding: 2em 1em;
+  font-size: 15px;
+}
+
+.ai-dm-lobby-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #6a3d12;
+  margin-bottom: 0.55em;
+  border-bottom: 1px solid #d8c89a;
+  padding-bottom: 0.4em;
+}
+
+.ai-dm-lobby-section {
+  font-weight: 600;
+  color: #3a2f1c;
+  margin-top: 0.7em;
+  margin-bottom: 0.25em;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.ai-dm-lobby-row {
+  padding: 0.15em 0;
+  font-size: 16px;
+}
+
+.ai-dm-lobby-missing {
+  margin-top: 0.7em;
+  color: #a02020;
+  font-style: italic;
+}
+
+.ai-dm-lobby-actions {
+  margin-top: 1em;
+  display: flex;
+  justify-content: center;
+}
+
+.ai-dm-lobby-start {
+  background: #2e7a2e;
+  color: #fff;
+  font-size: 17px;
+  font-weight: 600;
+  padding: 0.55em 1.4em;
+  border: 1px solid #1f5a1f;
+  border-radius: 6px;
+  cursor: pointer;
+  width: 100%;
+  box-sizing: border-box;
+}
+.ai-dm-lobby-start:hover {
+  background: #246924;
+}
+
+.ai-dm-lobby-hint {
+  margin-top: 0.55em;
+  text-align: center;
+  font-size: 13px;
+  color: #6a5b3a;
+}
+.ai-dm-lobby-hint code {
+  background: #e6dcc2;
+  padding: 0 0.3em;
+  border-radius: 3px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+

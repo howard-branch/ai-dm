@@ -13,6 +13,7 @@ from ai_dm.models.commands import (
     ActivateSceneCommand,
     GameCommand,
     HighlightObjectCommand,
+    MoveActorToCommand,
     MoveTokenCommand,
     UpdateActorCommand,
 )
@@ -89,6 +90,53 @@ class CommandRouter:
                     x=x,
                     y=y,
                     scene_id=raw.scene_id,
+                ).model_dump()
+
+            if raw.type == "move_actor_to":
+                # Pass actor_id + target through to Foundry — both
+                # actor→token and target→coords are resolved server-side.
+                # If the LocationService happens to know the anchor,
+                # eagerly resolve so older Foundry modules still work.
+                x, y = (raw.x, raw.y)
+                if (x is None or y is None) and raw.target \
+                        and self.location_service is not None:
+                    resolved = False
+                    if raw.scene_id:
+                        try:
+                            x, y = self.location_service.resolve_anchor(
+                                raw.scene_id, raw.target
+                            )
+                            resolved = True
+                        except RegistryMissError:
+                            pass
+                    if not resolved:
+                        # Fall back to a name lookup across every loaded
+                        # scene. The Foundry-supplied scene_id (an opaque
+                        # Foundry id) often doesn't match the campaign
+                        # pack's scene slug, so the per-scene lookup
+                        # misses and the player would otherwise get
+                        # "target not found on scene" with no movement.
+                        hit = self.location_service.resolve_anywhere(raw.target)
+                        if hit is not None:
+                            _sid, x, y = hit
+                            logger.info(
+                                "move_actor_to: anchor %r resolved cross-scene "
+                                "from %s → (%s, %s)",
+                                raw.target, _sid, x, y,
+                            )
+                        else:
+                            logger.info(
+                                "move_actor_to: no anchor matches %r; "
+                                "Foundry will try token/note name lookup",
+                                raw.target,
+                            )
+                return MoveActorToCommand(
+                    actor_id=self._require(raw.actor_id, "actor_id"),
+                    target=raw.target,
+                    target_id=raw.target_id,
+                    scene_id=raw.scene_id,
+                    x=x,
+                    y=y,
                 ).model_dump()
 
             if raw.type == "activate_scene":

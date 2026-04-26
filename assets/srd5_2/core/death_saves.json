@@ -1,0 +1,11 @@
+{
+  "dc": 10,
+  "successes_to_stable": 3,
+  "failures_to_die": 3,
+  "nat20_heals_to": 1,
+  "nat1_failures": 2,
+  "damage_at_zero_failures": 1,
+  "crit_at_zero_failures": 2,
+  "massive_damage_threshold_factor": 2
+}
+

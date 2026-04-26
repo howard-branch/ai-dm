@@ -1,0 +1,50 @@
+{
+  "_doc": "Per-archetype starting equipment kits. `items` are auto-allotted (referencing dnd5e_items.json by id). `currency.gp` is granted unconditionally; `shopping_budget_gp` is the additional gold the player may spend in the optional shopping step at create time. Any unspent shopping budget is added to currency.gp.",
+  "warrior": {
+    "items": [
+      {"id": "longsword", "qty": 1, "equipped": true},
+      {"id": "chain_mail", "qty": 1, "equipped": true},
+      {"id": "shield", "qty": 1, "equipped": true},
+      {"id": "dagger", "qty": 1, "equipped": false},
+      {"id": "explorers_pack", "qty": 1}
+    ],
+    "currency": {"gp": 10},
+    "shopping_budget_gp": 50
+  },
+  "rogue": {
+    "items": [
+      {"id": "shortsword", "qty": 1, "equipped": true},
+      {"id": "shortbow", "qty": 1, "equipped": false},
+      {"id": "arrows_20", "qty": 1, "equipped": false},
+      {"id": "leather_armor", "qty": 1, "equipped": true},
+      {"id": "thieves_tools", "qty": 1, "equipped": false},
+      {"id": "burglars_pack", "qty": 1},
+      {"id": "dagger", "qty": 2, "equipped": false}
+    ],
+    "currency": {"gp": 15},
+    "shopping_budget_gp": 40
+  },
+  "witch": {
+    "items": [
+      {"id": "dagger", "qty": 1, "equipped": true},
+      {"id": "arcane_focus_wand", "qty": 1, "equipped": true},
+      {"id": "leather_armor", "qty": 1, "equipped": true},
+      {"id": "scholars_pack", "qty": 1},
+      {"id": "component_pouch", "qty": 1}
+    ],
+    "currency": {"gp": 12},
+    "shopping_budget_gp": 35
+  },
+  "scholar": {
+    "items": [
+      {"id": "quarterstaff", "qty": 1, "equipped": true},
+      {"id": "spellbook", "qty": 1, "equipped": false},
+      {"id": "arcane_focus_orb", "qty": 1, "equipped": true},
+      {"id": "scholars_pack", "qty": 1},
+      {"id": "component_pouch", "qty": 1}
+    ],
+    "currency": {"gp": 8},
+    "shopping_budget_gp": 30
+  }
+}
+

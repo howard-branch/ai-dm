@@ -20,7 +20,9 @@ from ai_dm.audio.narration_dispatcher import NarrationDispatcher
 from ai_dm.audio.playback import play_bytes, play_stream
 from ai_dm.audio.speech_input import SpeechInput
 from ai_dm.audio.tts import NullBackend, TTSBackend, default_backend
+from ai_dm.audio.voice_input_pump import VoiceControlBridge, VoiceInputPump
 from ai_dm.audio.voices import VoiceProfile
+from ai_dm.app.transcript_logger import TranscriptLogger
 from ai_dm.campaign.pack import CampaignPack, seed_characters
 from ai_dm.foundry.authority import (
     AuthorityPolicy,
@@ -33,6 +35,7 @@ from ai_dm.foundry.command_queue import GLOBAL_SCOPE, SerialCommandQueue
 from ai_dm.foundry.journal import JournalService
 from ai_dm.foundry.reconciler import Reconciler
 from ai_dm.foundry.registry import FoundryRegistry
+from ai_dm.foundry.relay_supervisor import RelaySupervisor
 from ai_dm.foundry.socket_bridge import SocketBridge
 from ai_dm.foundry.sync_service import SyncService
 from ai_dm.foundry.validator import CommandValidator
@@ -61,7 +64,11 @@ from ai_dm.services.chapter_service import ChapterService
 class ContainerConfig:
     relay_url: str = "ws://127.0.0.1:8765"
     queue_max_pending: int = 32
-    queue_default_timeout: float = 10.0
+    # 30s — Foundry token movement / scene activation can take several
+    # seconds in a real browser (animations, server roundtrips), and a
+    # tight default produces "Timed out waiting for Foundry response"
+    # errors even though the command actually succeeds.
+    queue_default_timeout: float = 30.0
     default_scope: str = GLOBAL_SCOPE
     # ---- Campaign pack (preferred) -------------------------------- #
     # When set, all campaign-dependent paths (chapters, prompts,
@@ -90,6 +97,12 @@ class ContainerConfig:
     intent_confidence_threshold: float = 0.6
     triggers_enabled: bool = True
     inbound_foundry_enabled: bool = True
+    # Auto-start the WebSocket relay server in a background thread so a
+    # single ``python -m ai_dm.main`` brings the whole stack up. Set to
+    # False if you run ``scripts/run_foundry_replay.py`` separately.
+    autostart_relay: bool = True
+    relay_host: str = "127.0.0.1"
+    relay_port: int = 8765
     # Authority — Python is authoritative by default; per-event policy
     # below decides what happens to GM-side mutations.
     authority_policy: AuthorityPolicy = field(default_factory=AuthorityPolicy)
@@ -142,11 +155,14 @@ class Container:
     narration_dispatcher: Optional[NarrationDispatcher] = None
     speech_input: Optional[SpeechInput] = None
     voices: Optional[VoiceProfile] = None
+    voice_pump: Optional[VoiceInputPump] = None
+    voice_control: Optional[VoiceControlBridge] = None
     journal: Optional[JournalService] = None
     reconciler: Optional[Reconciler] = None
     socket_bridge: Optional[SocketBridge] = None
     arbiter: Optional[InboundArbiter] = None
     echo_suppressor: Optional[EchoSuppressor] = None
+    relay_supervisor: Optional[RelaySupervisor] = None
     actor_sessions: Optional[ActorSessionRegistry] = None
     player_input_dispatcher: Optional[PlayerInputDispatcher] = None
     structured_intent_dispatcher: Optional[StructuredIntentDispatcher] = None
@@ -174,7 +190,25 @@ class Container:
                 pass
         registry = FoundryRegistry()
         event_bus = EventBus()
+        # Persistent conversation transcript — one file per session,
+        # under <state_root>/transcripts/. Started immediately so any
+        # subsequent player_input / narrator.output_ready events get
+        # captured from turn 1.
+        transcript_logger = TranscriptLogger(
+            event_bus=event_bus, state_root=pack.state.root,
+        )
+        transcript_logger.start()
         client = FoundryClient(url=cfg.relay_url)
+        # Bring the relay up *before* the client tries to dial it so
+        # both inbound chat events and outbound commands work without
+        # the user having to launch a second process.
+        relay_supervisor: RelaySupervisor | None = None
+        if cfg.autostart_relay and cfg.inbound_foundry_enabled:
+            relay_supervisor = RelaySupervisor(host=cfg.relay_host, port=cfg.relay_port)
+            try:
+                relay_supervisor.start()
+            except Exception:  # noqa: BLE001
+                pass
         queue = SerialCommandQueue(
             client,
             max_pending=cfg.queue_max_pending,
@@ -212,6 +246,7 @@ class Container:
             npc_memory=npc_memory,
             relationships=relationships,
             location_service=location_service,
+            pack=pack,
         )
 
         schema_path = pack.paths.output_schema
@@ -247,6 +282,14 @@ class Container:
             event_bus=event_bus,
         )
         prompt_context.story_planner = story_planner
+
+        # Late-bind the travel deps now that the planner exists. The
+        # router needs the pack (for nodes.json + scene_locations) and
+        # the client (to push a fresh opening narration after a scene
+        # change).
+        intent_router.story_planner = story_planner
+        intent_router.pack = pack
+        intent_router.client = client
 
         # ---- Audio (TTS) ---- #
         tts = cfg.audio_backend or (
@@ -313,6 +356,7 @@ class Container:
                     "command_router": router,
                     "flags": flags,
                     "combat": combat,
+                    "chapters": chapter_service,
                 }
                 triggers.load(load_triggers(pack.paths.triggers, deps=deps))
             except Exception:  # noqa: BLE001
@@ -330,6 +374,17 @@ class Container:
         socket_bridge = SocketBridge(client, event_bus)
         if cfg.inbound_foundry_enabled:
             socket_bridge.connect()
+            # Eagerly open the WebSocket so inbound /act chat events
+            # are received from the moment Foundry connects, not just
+            # after the first outbound command. Then keep retrying in
+            # the background so the link survives relay restarts.
+            client.try_connect()
+            client.start_reconnect()
+            # Refresh the census cache every 10s so timeout
+            # diagnostics can name *who* is connected without an
+            # in-line probe (which itself could stall during the same
+            # hiccup that's causing the timeout).
+            client.start_census_poll(interval=10.0)
 
         # ---- Authority arbitration ---- #
         # Python is authoritative. The arbiter consumes ``foundry.*``
@@ -393,6 +448,29 @@ class Container:
             player_input_dispatcher.start()
             structured_intent_dispatcher.start()
 
+        # ---- Voice input pump (host mic → foundry.player_input) ---- #
+        # Constructed unconditionally so it can be flipped on at any
+        # time from the Foundry browser via ``/voice on``. Auto-start
+        # only when AI_DM_VOICE=1 *and* an actor is provided via
+        # AI_DM_VOICE_ACTOR (otherwise we wait for the chat command,
+        # which carries the player's controlled actor).
+        import os as _os
+        voice_pump = VoiceInputPump(
+            event_bus=event_bus,
+            speech_input=speech_input,
+            audio_queue=audio_queue,
+            client=client,
+            actor_id=_os.environ.get("AI_DM_VOICE_ACTOR") or None,
+        )
+        voice_control = VoiceControlBridge(
+            event_bus=event_bus, pump=voice_pump, client=client,
+        )
+        if cfg.inbound_foundry_enabled:
+            voice_control.start()
+        if (_os.environ.get("AI_DM_VOICE", "").strip().lower()
+                in {"1", "true", "yes", "on"}):
+            voice_pump.start()
+
         return cls(
             config=cfg,
             pack=pack,
@@ -431,9 +509,12 @@ class Container:
             socket_bridge=socket_bridge,
             arbiter=arbiter,
             echo_suppressor=echo_suppressor,
+            relay_supervisor=relay_supervisor,
             actor_sessions=actor_sessions,
             player_input_dispatcher=player_input_dispatcher,
             structured_intent_dispatcher=structured_intent_dispatcher,
+            voice_pump=voice_pump,
+            voice_control=voice_control,
             flags=flags,
             actor_state=actor_state,
             token_state=token_state,
@@ -480,6 +561,26 @@ class Container:
         if self.structured_intent_dispatcher is not None:
             try:
                 self.structured_intent_dispatcher.stop()
+            except Exception:  # noqa: BLE001
+                pass
+        if self.voice_control is not None:
+            try:
+                self.voice_control.stop()
+            except Exception:  # noqa: BLE001
+                pass
+        if self.voice_pump is not None:
+            try:
+                self.voice_pump.stop()
+            except Exception:  # noqa: BLE001
+                pass
+        if self.client is not None:
+            try:
+                self.client.stop_reconnect()
+            except Exception:  # noqa: BLE001
+                pass
+        if self.relay_supervisor is not None:
+            try:
+                self.relay_supervisor.stop()
             except Exception:  # noqa: BLE001
                 pass
         if self.queue is not None:

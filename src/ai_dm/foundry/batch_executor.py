@@ -210,6 +210,22 @@ class BatchExecutor:
                     timeout=timeout,
                 ).result()
                 unwrap_single_result(response)
+            except TimeoutError as exc:
+                # Most "timed out waiting for Foundry response" cases
+                # are caused by no GM browser being connected to the
+                # relay (only the GM client executes mutating commands).
+                # Probe the relay census so the rollback message tells
+                # the user *why* it stalled.
+                detail = self._timeout_detail()
+                full = f"{exc}{(' — ' + detail) if detail else ''}"
+                outcome.ok = False
+                outcome.results.append(
+                    StepResult(command=cmd, response=None, ok=False, error=full)
+                )
+                logger.warning("batch step timed out: %s — %s", cmd.type, full)
+                if atomic:
+                    self._rollback(successes, outcome)
+                return outcome
             except Exception as exc:  # noqa: BLE001
                 outcome.ok = False
                 outcome.results.append(
@@ -230,6 +246,60 @@ class BatchExecutor:
         return outcome
 
     # ------------------------------------------------------------------ #
+
+    # ------------------------------------------------------------------ #
+
+    def _timeout_detail(self) -> str:
+        """Best-effort relay census so the timeout error explains itself.
+
+        Prefers ``client.last_census`` (refreshed by the background
+        census poller in :class:`FoundryClient`) so this never blocks
+        on a slow ``who()`` call during the same relay hiccup we're
+        trying to diagnose. Falls back to a synchronous probe with a
+        generous timeout if no cached census is available yet.
+        """
+        client = getattr(self.queue, "client", None)
+        if client is None:
+            return ""
+        from time import monotonic as _mono
+
+        census = getattr(client, "last_census", None)
+        cached_age = None
+        if census:
+            cached_age = _mono() - getattr(client, "last_census_at", 0.0)
+            # Stale caches (>60s) shouldn't be reported as truth — fall
+            # through to a fresh probe.
+            if cached_age > 60.0:
+                census = None
+
+        if census is None and hasattr(client, "who"):
+            try:
+                census = client.who(timeout=2.0)
+            except Exception:  # noqa: BLE001
+                census = None
+
+        if not census:
+            return (
+                "no relay census available — either the WS relay isn't "
+                "running yet or no Foundry client is connected"
+            )
+        gm = int(census.get("foundry_gm_count") or 0)
+        total = int(census.get("foundry_count") or 0)
+        suffix = (
+            f" (cached {cached_age:.0f}s ago)"
+            if cached_age is not None and cached_age > 5
+            else ""
+        )
+        if gm == 0:
+            return (
+                f"no Foundry GM connected ({total} client(s), 0 GM){suffix}; "
+                "world commands only run on the GM browser tab — open "
+                "Foundry and log in as the GM user"
+            )
+        return (
+            f"{gm} GM, {total} client(s) connected{suffix} — GM browser tab "
+            "may be paused/blocked (background tab? a modal dialog open?)"
+        )
 
     def _rollback(
         self,

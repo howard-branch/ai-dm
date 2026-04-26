@@ -75,6 +75,121 @@ def start_encounter(combat, encounter_id: str, participants: list[dict]) -> Acti
     return _a
 
 
+def roll_random_encounter(
+    event_bus,
+    chapters,
+    table: list[dict],
+    *,
+    seed_key: str | None = None,
+) -> Action:
+    """Weighted roll over an encounter table.
+
+    ``table`` shape::
+
+        [
+          {"weight": 5, "encounter_id": null,   "narration": "The road is quiet."},
+          {"weight": 2, "encounter_id": "encounter.skeletal_bats"},
+          {"weight": 1, "encounter_id": "encounter.ancient_devotees",
+           "narration": "Hymns drift from the broken chapel ahead."}
+        ]
+
+    A null ``encounter_id`` means "no encounter this leg" and acts as a
+    weighted no-op. When an encounter is selected the action:
+
+      1. Looks up the encounter's display name and monsters from the
+         active chapter (``ChapterService``).
+      2. Publishes ``narrator.output_ready`` with a flavor line so the
+         player sees that something happened on the road.
+      3. Publishes ``random_encounter.rolled`` with the resolved
+         encounter id + monster summary, so downstream listeners
+         (combat machine, journal, save state) can react.
+    """
+    import random as _random
+
+    weighted = [
+        (max(0, int(e.get("weight", 1))), e)
+        for e in (table or [])
+        if isinstance(e, dict)
+    ]
+    total = sum(w for w, _ in weighted)
+
+    def _a(payload: dict, _ctx: dict) -> None:
+        if total <= 0 or not weighted:
+            return
+        rng = _random.Random(seed_key) if seed_key else _random
+        roll = rng.randint(1, total)
+        cum = 0
+        chosen: dict | None = None
+        for w, entry in weighted:
+            cum += w
+            if roll <= cum:
+                chosen = entry
+                break
+        if chosen is None:
+            return
+
+        eid = chosen.get("encounter_id")
+        narration = chosen.get("narration") or ""
+        monsters: list[dict] = []
+        encounter_name = ""
+        scene_id = (payload or {}).get("scene_id")
+
+        if eid and chapters is not None:
+            # Look the encounter up in the current chapter (or any
+            # chapter if not found there) so we can quote real
+            # monster names in the flavor narration.
+            try:
+                for chap in chapters.all():
+                    for enc in chap.encounters or []:
+                        if enc.get("id") == eid:
+                            encounter_name = enc.get("name") or ""
+                            monsters = enc.get("monsters") or []
+                            break
+                    if encounter_name:
+                        break
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("random encounter lookup failed: %s", exc)
+
+        if not narration and eid:
+            mons_str = ", ".join(
+                f"{m.get('count', 1)}× {m.get('name', '?')}" for m in monsters
+            ) or "unseen attackers"
+            label = encounter_name or eid
+            narration = f"As you travel, danger emerges — {label} ({mons_str})."
+        elif not narration and not eid:
+            return  # silent no-op
+
+        try:
+            event_bus.publish(
+                "narrator.output_ready",
+                {
+                    "narration": narration,
+                    "dialogue": [],
+                    "source": "random_encounter",
+                    "scene_id": scene_id,
+                    "encounter_id": eid,
+                },
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("random encounter narration publish failed: %s", exc)
+
+        if eid:
+            try:
+                event_bus.publish(
+                    "random_encounter.rolled",
+                    {
+                        "encounter_id": eid,
+                        "scene_id": scene_id,
+                        "name": encounter_name,
+                        "monsters": monsters,
+                    },
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("random_encounter.rolled publish failed: %s", exc)
+
+    return _a
+
+
 # ---------------------------------------------------------------------- #
 # YAML factory
 # ---------------------------------------------------------------------- #
@@ -99,5 +214,12 @@ def from_spec(spec: dict, *, deps: dict) -> Action:
         return speak(deps["event_bus"], args["text"], args.get("voice"))
     if op == "start_encounter":
         return start_encounter(deps["combat"], args["encounter_id"], args.get("participants", []))
+    if op == "roll_random_encounter":
+        return roll_random_encounter(
+            deps["event_bus"],
+            deps.get("chapters"),
+            args.get("table") or [],
+            seed_key=args.get("seed_key"),
+        )
     raise ValueError(f"unknown action op: {op!r}")
 

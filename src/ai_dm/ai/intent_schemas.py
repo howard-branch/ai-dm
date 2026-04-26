@@ -12,12 +12,22 @@ from pydantic import BaseModel, ConfigDict, Field
 
 IntentType = Literal[
     "move",
+    "travel",   # cross-scene travel (different from in-scene `move`)
     "attack",
     "cast_spell",
     "skill_check",
     "interact",
     "speak",
     "use_item",
+    # --- combat action menu (5e SRD) ----------------------------- #
+    "dash",
+    "disengage",
+    "dodge",
+    "help",
+    "hide",
+    "ready",
+    "end_turn",
+    # ------------------------------------------------------------ #
     "query_world",
     "meta",
     "unknown",

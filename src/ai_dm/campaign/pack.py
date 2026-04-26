@@ -71,6 +71,11 @@ _DEFAULT_OVERRIDES: dict[str, str] = {
     "audio": "audio",
     "system_narrator": "prompts/system_narrator.txt",
     "output_schema": "prompts/output_schema.json",
+    # Optional per-pack rules overlay directory. Files here (named the
+    # same as the shared catalogs under ``assets/rules/``, e.g.
+    # ``dnd5e_items.json``) are deep-merged on top of the shared
+    # catalogs by ``ai_dm.app.catalog_loader.load_overlay``.
+    "rules": "rules",
 }
 
 
@@ -157,6 +162,8 @@ class CampaignPaths:
     def system_narrator(self) -> Path: return self._p("system_narrator")
     @property
     def output_schema(self) -> Path: return self._p("output_schema")
+    @property
+    def rules(self) -> Path: return self._p("rules")
 
 
 # --------------------------------------------------------------------- #

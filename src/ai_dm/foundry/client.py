@@ -64,6 +64,22 @@ class FoundryClient:
         # onto the in-process ``EventBus``. Default ``None`` means the
         # client silently drops inbound events.
         self.on_push = None  # type: ignore[assignment]
+        # Background reconnect loop. Started by :meth:`start_reconnect`
+        # so inbound chat events keep flowing across relay restarts.
+        self._reconnect_thread: threading.Thread | None = None
+        self._reconnect_stop = threading.Event()
+        # Pending ``who`` census request — populated by :meth:`who`,
+        # resolved by ``_handle_incoming`` when ``who_ack`` arrives.
+        self._who_event = threading.Event()
+        self._who_response: dict[str, Any] | None = None
+        # Last successful census, refreshed by every ``who_ack`` (so
+        # ``BatchExecutor`` can produce useful timeout diagnostics
+        # without a synchronous probe). The timestamp is monotonic.
+        self.last_census: dict[str, Any] | None = None
+        self.last_census_at: float = 0.0
+        # Background census poller (started by ``start_census_poll``).
+        self._census_thread: threading.Thread | None = None
+        self._census_stop = threading.Event()
 
     # ------------------------------------------------------------------ #
     # Public API
@@ -276,6 +292,13 @@ class FoundryClient:
         if msg_type == "pong":
             return
 
+        if msg_type == "who_ack":
+            self._who_response = msg
+            self.last_census = msg
+            self.last_census_at = monotonic()
+            self._who_event.set()
+            return
+
         if msg_type == "event":
             # Foundry-originated push event (Phase 3 inbound bridge).
             cb = self.on_push
@@ -295,4 +318,123 @@ class FoundryClient:
     def _inject_result(self, msg: dict[str, Any]) -> None:
         """Feed a result envelope as if it came from the relay (test only)."""
         self._handle_incoming(msg)
+
+    # ------------------------------------------------------------------ #
+    # Eager connect / reconnect (so inbound events keep flowing without
+    # waiting for the first outbound write).
+    # ------------------------------------------------------------------ #
+
+    def try_connect(self, *, retries: int = 5, delay: float = 0.5) -> bool:
+        """Best-effort eager connect. Returns True on success.
+
+        Without this, the receive loop only starts after the first
+        outbound ``send()`` — which means inbound ``/act`` chat events
+        are silently dropped until Python happens to write something.
+        """
+        for attempt in range(retries):
+            try:
+                self._ensure_connected()
+                return True
+            except Exception as exc:  # noqa: BLE001
+                logger.info(
+                    "eager connect to %s failed (attempt %d/%d): %s",
+                    self.url, attempt + 1, retries, exc,
+                )
+                if attempt + 1 < retries:
+                    import time as _t
+                    _t.sleep(delay)
+        return False
+
+    def start_reconnect(self, *, interval: float = 2.0) -> None:
+        """Start a background thread that re-establishes the connection
+        whenever the receive loop drops it (e.g. relay restart).
+        """
+        if self._reconnect_thread is not None:
+            return
+        self._reconnect_stop.clear()
+
+        def _loop() -> None:
+            import time as _t
+            while not self._reconnect_stop.is_set():
+                if not self._connected:
+                    try:
+                        self._ensure_connected()
+                    except Exception as exc:  # noqa: BLE001
+                        logger.debug("reconnect attempt failed: %s", exc)
+                _t.sleep(interval)
+
+        self._reconnect_thread = threading.Thread(
+            target=_loop, name="foundry-reconnect", daemon=True
+        )
+        self._reconnect_thread.start()
+
+    def stop_reconnect(self) -> None:
+        self._reconnect_stop.set()
+        if self._reconnect_thread is not None:
+            self._reconnect_thread.join(timeout=1.0)
+            self._reconnect_thread = None
+        self.stop_census_poll()
+
+    # ------------------------------------------------------------------ #
+    # Census / health
+    # ------------------------------------------------------------------ #
+
+    def start_census_poll(self, *, interval: float = 10.0) -> None:
+        """Refresh ``last_census`` periodically in the background.
+
+        Lets diagnostic code (e.g. ``BatchExecutor._timeout_detail``)
+        report the most recently observed GM/player counts without an
+        inline ``who()`` probe that may itself stall during the same
+        relay hiccup that's causing the timeout it's trying to explain.
+        """
+        if self._census_thread is not None:
+            return
+        self._census_stop.clear()
+        import time as _t
+
+        def _loop() -> None:
+            # Initial probe after a short grace period so the WS handshake
+            # has time to complete.
+            _t.sleep(min(interval, 1.0))
+            while not self._census_stop.is_set():
+                try:
+                    self.who(timeout=2.0)
+                except Exception as exc:  # noqa: BLE001
+                    logger.debug("census poll failed: %s", exc)
+                _t.sleep(interval)
+
+        self._census_thread = threading.Thread(
+            target=_loop, name="foundry-census", daemon=True,
+        )
+        self._census_thread.start()
+
+    def stop_census_poll(self) -> None:
+        self._census_stop.set()
+        if self._census_thread is not None:
+            self._census_thread.join(timeout=1.0)
+            self._census_thread = None
+
+    def who(self, *, timeout: float = 1.0) -> dict[str, Any] | None:
+        """Ask the relay how many clients are connected and who they are.
+
+        Returns the ``who_ack`` payload (with ``foundry_count``,
+        ``foundry_gm_count`` and ``foundry_clients``), or ``None`` if
+        the relay is unreachable or didn't reply in time.
+        """
+        try:
+            self._ensure_connected()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("who() — relay not reachable: %s", exc)
+            return None
+        self._who_response = None
+        self._who_event.clear()
+        try:
+            self._send_json({"type": "who"})
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("who() — send failed: %s", exc)
+            return None
+        if not self._who_event.wait(timeout=timeout):
+            logger.warning("who() — relay did not respond within %.1fs", timeout)
+            return None
+        return self._who_response
 

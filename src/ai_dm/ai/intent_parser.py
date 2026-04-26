@@ -26,9 +26,25 @@ _ATTACK_RE = re.compile(
     re.IGNORECASE,
 )
 
-# "I move to the altar", "go to the door"
+# "travel to shadowgrange", "journey north", "set out for the chapel",
+# "depart for shadowgrange", "leave for shadowgrange", "head north".
+# Travel is a *cross-scene* move (activate_scene + new opening) — the
+# in-scene `move` regex below stays, but the verbs above are reserved
+# for the travel handler so the parser can disambiguate without
+# guessing whether a target is a scene id or an in-scene anchor.
+_TRAVEL_RE = re.compile(
+    r"\b(?:i\s+)?(?:travel|journey|set\s+(?:out|off)|depart|leave\s+for|march)"
+    r"(?:\s+(?:to|toward|towards|for))?\s+"
+    r"(?:the\s+|a\s+|an\s+)?(?P<dest>[\w' \-]+?)\s*[.!?]*$",
+    re.IGNORECASE,
+)
+
+# "I move to the altar", "go to the door", "move_actor_to pass_overlook"
+# (the underscore form lets us round-trip the LLM-emitted command type
+# verbatim, and the optional `to` lets the player just say "go altar").
 _MOVE_RE = re.compile(
-    r"\b(?:i\s+)?(?:move|go|walk|run|approach|head)\s+(?:to|toward|towards)\s+"
+    r"\b(?:i\s+)?(?:move(?:_actor)?(?:_to)?|goto|go|walk|run|approach|head)"
+    r"(?:\s+(?:to|toward|towards))?\s+"
     r"(?:the\s+|a\s+|an\s+)?(?P<anchor>[\w' \-]+?)\s*[.!?]*$",
     re.IGNORECASE,
 )
@@ -51,8 +67,38 @@ _USE_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Meta verbs
-_META_RE = re.compile(r"^\s*(?:save|load|recap|undo|help)\b", re.IGNORECASE)
+# Meta verbs. Matches "save", "load", "recap", "undo", or a *bare*
+# "help" (with no following target). "help <name>" is the combat
+# Help action and is handled separately below.
+_META_RE = re.compile(
+    r"^\s*(?:save|load|recap|undo|help)\s*[.!?]*\s*$",
+    re.IGNORECASE,
+)
+
+# Combat action menu (5e SRD). These are matched before generic
+# verb regexes so "I help Vex" doesn't slip into the use/attack path.
+_DASH_RE = re.compile(r"^\s*(?:i\s+)?dash\b\s*[.!?]*$", re.IGNORECASE)
+_DISENGAGE_RE = re.compile(r"^\s*(?:i\s+)?disengage\b\s*[.!?]*$", re.IGNORECASE)
+_DODGE_RE = re.compile(r"^\s*(?:i\s+)?dodge\b\s*[.!?]*$", re.IGNORECASE)
+_HIDE_RE = re.compile(r"^\s*(?:i\s+)?hide\b\s*[.!?]*$", re.IGNORECASE)
+_END_TURN_RE = re.compile(
+    r"^\s*(?:i\s+)?(?:end\s+turn|end\s+my\s+turn|done|pass)\b\s*[.!?]*$",
+    re.IGNORECASE,
+)
+_HELP_TARGET_RE = re.compile(
+    r"^\s*(?:i\s+)?help\s+(?:the\s+|a\s+|an\s+)?(?P<target>[\w' \-]+?)\s*[.!?]*$",
+    re.IGNORECASE,
+)
+_READY_RE = re.compile(
+    r"^\s*(?:i\s+)?ready\s+(?:an?\s+)?(?P<sub>attack|action|spell|cast)\b"
+    r"(?:\s+(?:to|when|if)\s+(?P<trigger>.+?))?\s*[.!?]*$",
+    re.IGNORECASE,
+)
+_CAST_RE = re.compile(
+    r"^\s*(?:i\s+)?(?:cast|invoke)\s+(?:the\s+)?(?P<spell>[\w' \-]+?)"
+    r"(?:\s+(?:on|at)\s+(?:the\s+|a\s+|an\s+)?(?P<target>[\w' \-]+?))?\s*[.!?]*$",
+    re.IGNORECASE,
+)
 
 _LLM_PROMPT_TEMPLATE = """\
 You are a parser. Convert the player's utterance to a JSON object with the
@@ -69,7 +115,8 @@ Respond with one JSON object only, no prose.
 """
 
 _INTENT_TYPES = (
-    "move,attack,cast_spell,skill_check,interact,speak,use_item,"
+    "move,travel,attack,cast_spell,skill_check,interact,speak,use_item,"
+    "dash,disengage,dodge,help,hide,ready,end_turn,"
     "query_world,meta,unknown"
 )
 
@@ -123,6 +170,60 @@ class IntentParser:
                 actor_id=self.default_actor_id,
             )
 
+        # Combat action menu — single-word verbs first.
+        if _DASH_RE.match(text):
+            return PlayerIntent(
+                type="dash", verb="dash", actor_id=self.default_actor_id,
+                raw_text=text, confidence=0.95,
+            )
+        if _DISENGAGE_RE.match(text):
+            return PlayerIntent(
+                type="disengage", verb="disengage", actor_id=self.default_actor_id,
+                raw_text=text, confidence=0.95,
+            )
+        if _DODGE_RE.match(text):
+            return PlayerIntent(
+                type="dodge", verb="dodge", actor_id=self.default_actor_id,
+                raw_text=text, confidence=0.95,
+            )
+        if _HIDE_RE.match(text):
+            return PlayerIntent(
+                type="hide", verb="hide", actor_id=self.default_actor_id,
+                raw_text=text, confidence=0.9,
+            )
+        if _END_TURN_RE.match(text):
+            return PlayerIntent(
+                type="end_turn", verb="end_turn", actor_id=self.default_actor_id,
+                raw_text=text, confidence=0.95,
+            )
+        m = _HELP_TARGET_RE.match(text)
+        if m:
+            return PlayerIntent(
+                type="help", verb="help", actor_id=self.default_actor_id,
+                target_id=_clean(m.group("target")),
+                raw_text=text, confidence=0.85,
+            )
+        m = _READY_RE.match(text)
+        if m:
+            sub = (m.group("sub") or "").lower()
+            sub_action = "cast_spell" if sub in ("spell", "cast") else "attack"
+            extra = {"action": sub_action}
+            if m.group("trigger"):
+                extra["trigger"] = _clean(m.group("trigger")) or ""
+            return PlayerIntent(
+                type="ready", verb="ready", actor_id=self.default_actor_id,
+                raw_text=text, confidence=0.85, extra=extra,
+            )
+        m = _CAST_RE.match(text)
+        if m:
+            return PlayerIntent(
+                type="cast_spell", verb="cast",
+                actor_id=self.default_actor_id,
+                spell=_clean(m.group("spell")),
+                target_id=_clean(m.group("target")) if m.group("target") else None,
+                raw_text=text, confidence=0.85,
+            )
+
         m = _SPEAK_RE.search(text)
         if m:
             return PlayerIntent(
@@ -148,6 +249,19 @@ class IntentParser:
                 actor_id=self.default_actor_id,
                 target_id=_clean(m.group("target")),
                 weapon=_clean(m.group("weapon")) if m.group("weapon") else None,
+                raw_text=text,
+                confidence=0.85,
+            )
+
+        m = _TRAVEL_RE.search(text)
+        if m:
+            dest = _clean(m.group("dest"))
+            return PlayerIntent(
+                type="travel",
+                verb="travel",
+                actor_id=self.default_actor_id,
+                target_id=dest,
+                target_anchor=dest,
                 raw_text=text,
                 confidence=0.85,
             )

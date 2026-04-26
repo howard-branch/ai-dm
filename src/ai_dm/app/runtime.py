@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
+import signal
 import threading
 
 logger = logging.getLogger("ai_dm.app.runtime")
@@ -18,6 +20,13 @@ logger = logging.getLogger("ai_dm.app.runtime")
 _BANNER = (
     "AI DM runtime started. Type a prompt and press Enter.\n"
     "Type :help for the command list.\n"
+)
+_REMOTE_BANNER = (
+    "AI DM runtime started in Foundry-driven mode.\n"
+    "Open the Foundry world in your browser and use chat (`/act ...`)\n"
+    "to play. The local terminal will only print logs and shutdown\n"
+    "messages — press Ctrl-C to stop the server.\n"
+    "Set AI_DM_LOCAL_REPL=1 to re-enable the local text REPL.\n"
 )
 _HELP = (
     "  <text>          Send <text> to the DM as your character's input.\n"
@@ -73,20 +82,49 @@ class Runtime:
         self.container = container
         self._scene_id: str | None = None
         self._voice_on_start = voice_on_start
+        self._shutdown = threading.Event()
 
     # ------------------------------------------------------------------ #
 
     def start(self) -> None:
-        print(_BANNER)
+        # Default mode: stay quietly in the background so player input
+        # arrives via the connected Foundry browser (relay → SocketBridge
+        # → PlayerInputDispatcher → Director). Set ``AI_DM_LOCAL_REPL=1``
+        # to bring back the legacy stdin loop for offline debugging.
+        local_repl = (os.environ.get("AI_DM_LOCAL_REPL", "").strip().lower()
+                      in {"1", "true", "yes", "on"})
+        print(_BANNER if local_repl else _REMOTE_BANNER)
         self._announce_character()
         try:
-            if self._voice_on_start:
-                # Drop straight into hands-free mode. When the user
-                # exits voice mode we fall through to the text loop.
-                self._voice_loop()
-            self._loop()
+            if local_repl:
+                if self._voice_on_start:
+                    self._voice_loop()
+                self._loop()
+            else:
+                self._wait_for_shutdown()
         finally:
             self.shutdown()
+
+    def _wait_for_shutdown(self) -> None:
+        """Block until SIGINT / SIGTERM. Foundry-driven mode."""
+        def _handle(_signum, _frame):  # noqa: ANN001
+            self._shutdown.set()
+
+        # Best-effort: only the main thread can install signal handlers.
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            try:
+                signal.signal(sig, _handle)
+            except (ValueError, OSError):
+                pass
+        try:
+            while not self._shutdown.is_set():
+                # Long but bounded wait so KeyboardInterrupt on platforms
+                # that don't deliver to ``Event.wait`` still surfaces.
+                if self._shutdown.wait(timeout=1.0):
+                    return
+        except KeyboardInterrupt:
+            self._shutdown.set()
+        print("\n[shutting down]")
 
     def _loop(self) -> None:
         while True:

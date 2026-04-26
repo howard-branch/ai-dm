@@ -17,6 +17,27 @@ class MoveTokenCommand(BaseCommand):
     scene_id: str | None = None
 
 
+class MoveActorToCommand(BaseCommand):
+    """Move the token controlled by an actor toward a named target.
+
+    Actor → token resolution and target → coordinate resolution both
+    happen on the Foundry side (see token_commands.js#moveActorTo), so
+    Python doesn't need a populated anchor registry to route a player's
+    "I move toward the altar" intent through to the canvas.
+
+    Provide ``target`` (a name like "altar" / "Bran" / id) **or**
+    ``target_id`` (an exact token id) **or** explicit ``x``/``y``.
+    """
+
+    type: Literal["move_actor_to"] = "move_actor_to"
+    actor_id: str
+    target: str | None = None
+    target_id: str | None = None
+    scene_id: str | None = None
+    x: int | None = None
+    y: int | None = None
+
+
 class ActivateSceneCommand(BaseCommand):
     type: Literal["activate_scene"] = "activate_scene"
     scene_id: str
@@ -59,6 +80,10 @@ class CreateActorCommand(BaseCommand):
     # "system.attributes.hp.max") to target nested fields.
     system: dict = Field(default_factory=dict)
     img: str | None = None
+    # Optional list of Foundry Item documents (weapons, armour, spells,
+    # feats) to embed under the actor immediately after creation. Each
+    # entry is a dict shaped like {name, type, system: {...}}.
+    items: list[dict] = Field(default_factory=list)
 
 
 # ------------------------------------------------------------------ #
@@ -114,8 +139,30 @@ class UpdateJournalCommand(BaseCommand):
     content: str | None = None
 
 
+# ------------------------------------------------------------------ #
+# Scene-decoration commands (anchor pins, etc).
+# ------------------------------------------------------------------ #
+
+class CreateNoteCommand(BaseCommand):
+    """Drop an idempotent journal-pin note on a Foundry scene.
+
+    Used at startup to project campaign-pack anchors as in-world map
+    pins so ``move_actor_to "valley overlook"`` resolves via the
+    Foundry-side ``findTargetOnScene`` (which searches notes by name).
+    Idempotent on the JS side: re-running with the same ``text`` reuses
+    the existing pin instead of creating a duplicate.
+    """
+    type: Literal["create_note"] = "create_note"
+    scene_id: str | None = None  # default: active scene
+    x: int = 0
+    y: int = 0
+    text: str
+    icon: str | None = None
+
+
 GameCommand = Union[
     MoveTokenCommand,
+    MoveActorToCommand,
     ActivateSceneCommand,
     UpdateActorCommand,
     HighlightObjectCommand,
@@ -130,4 +177,5 @@ GameCommand = Union[
     ReadActiveSceneCommand,
     CreateJournalCommand,
     UpdateJournalCommand,
+    CreateNoteCommand,
 ]

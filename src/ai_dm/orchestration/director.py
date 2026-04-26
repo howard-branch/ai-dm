@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Iterable
 
 from ai_dm.ai.context_builder import PromptContextBuilder
+from ai_dm.ai.intent_parser import IntentParser
 from ai_dm.ai.intent_router import IntentRouter
 from ai_dm.ai.narrator import Narrator
 from ai_dm.ai.schemas import AIOutput, NPCDialogueLine
@@ -21,6 +22,7 @@ class Director:
         prompt_context: PromptContextBuilder | None = None,
         npc_memory: NPCMemoryStore | None = None,
         intent_router: IntentRouter | None = None,
+        intent_parser: IntentParser | None = None,
         event_bus: EventBus | None = None,
     ) -> None:
         self.state_store = state_store
@@ -29,6 +31,7 @@ class Director:
         self.prompt_context = prompt_context
         self.npc_memory = npc_memory
         self.intent_router = intent_router
+        self.intent_parser = intent_parser
         self.event_bus = event_bus
 
     def handle_player_input(
@@ -37,7 +40,15 @@ class Director:
         *,
         focus_npcs: Iterable[str] | None = None,
         scene_id: str | None = None,
+        actor_id: str | None = None,
     ) -> AIOutput:
+        # Phase 3.1: parse the utterance for a mechanical intent (move,
+        # attack, skill check, …) BEFORE running the narrator. Movement
+        # / interact intents are dispatched directly through the
+        # IntentRouter so the token actually moves on the canvas; the
+        # narrator still runs afterwards to describe the action.
+        self._maybe_dispatch_intent(player_input, scene_id=scene_id, actor_id=actor_id)
+
         context = self._build_context(player_input, focus_npcs=focus_npcs, scene_id=scene_id)
         result = self.narrator.narrate(player_input=player_input, context=context)
 
@@ -93,6 +104,48 @@ class Director:
             return self.state_store.get_context()
         except Exception:  # noqa: BLE001
             return {}
+
+    # ------------------------------------------------------------------ #
+    # Intent dispatch
+    # ------------------------------------------------------------------ #
+
+    _MECHANICAL_INTENT_TYPES = ("move", "interact", "attack", "skill_check")
+
+    def _maybe_dispatch_intent(
+        self,
+        text: str,
+        *,
+        scene_id: str | None,
+        actor_id: str | None,
+    ) -> None:
+        """Run the IntentParser and route mechanical intents through the
+        IntentRouter so they reach the canvas (move tokens etc).
+
+        No-op when no parser/router is wired (e.g. in unit tests with a
+        bare Director). Failures are swallowed so they never break the
+        narrator flow that runs immediately after.
+        """
+        if self.intent_parser is None or self.intent_router is None:
+            return
+        try:
+            intent = self.intent_parser.parse(text, ctx={
+                "scene_id": scene_id,
+                "actor_id": actor_id,
+            })
+        except Exception:  # noqa: BLE001
+            return
+        if intent.type not in self._MECHANICAL_INTENT_TYPES:
+            return
+        # Override the parser's default actor_id ("player") with the
+        # real Foundry actor id from the chat event.
+        if actor_id:
+            intent.actor_id = actor_id
+        try:
+            self.intent_router.handle(
+                intent, ctx={"scene_id": scene_id, "actor_id": actor_id}
+            )
+        except Exception:  # noqa: BLE001
+            return
 
     def _record_dialogue(self, dialogue: list[NPCDialogueLine]) -> None:
         if not dialogue or self.npc_memory is None:

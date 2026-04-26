@@ -95,6 +95,10 @@ class CombatMachine:
         self._transition("in_round")
         s.round += 1
         s.current_index = 0
+        # Reaction + per-round resources refresh for every combatant
+        # before the first actor of the round starts their turn.
+        for p in s.participants:
+            p.start_of_round()
         self._publish("combat.round_started", {"round": s.round})
         return s.round
 
@@ -102,6 +106,8 @@ class CombatMachine:
         s = self._require_state()
         self._transition("awaiting_action")
         actor = s.participants[s.current_index]
+        # Action economy + per-turn resources reset on the active actor.
+        actor.start_of_turn()
         self._publish(
             "combat.actor_highlighted",
             {"actor_id": actor.actor_id, "round": s.round},
@@ -153,6 +159,8 @@ class CombatMachine:
     def end_encounter(self, reason: str = "ended") -> CombatState:
         s = self._require_state()
         self._transition("ended")
+        for p in s.participants:
+            p.end_encounter()
         self._publish(
             "combat.encounter_ended",
             {"encounter_id": s.encounter_id, "reason": reason},

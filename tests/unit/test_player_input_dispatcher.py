@@ -13,7 +13,7 @@ class _StubDirector:
         self.calls = []
         self._narration = narration
 
-    def handle_player_input(self, text, *, scene_id=None, focus_npcs=None):
+    def handle_player_input(self, text, *, scene_id=None, focus_npcs=None, actor_id=None):
         self.calls.append({"text": text, "scene_id": scene_id})
         return SimpleNamespace(
             narration=self._narration,
@@ -44,12 +44,13 @@ def _build():
 
 
 def test_dispatch_runs_director_and_pushes_narration():
-    bus, sessions, client, director, _ = _build()
+    bus, sessions, client, director, disp = _build()
     bus.publish("foundry.player_input", {
         "user_id": "u-1", "user_name": "Alice",
         "actor_id": "a-1", "actor_name": "Morgana",
         "scene_id": "s-1", "text": "open the door",
     })
+    assert disp.wait_idle(timeout=2.0)
     assert director.calls == [{"text": "open the door", "scene_id": "s-1"}]
     assert len(client.events) == 1
     name, payload = client.events[0]
@@ -79,13 +80,15 @@ def test_director_failure_pushes_error_envelope():
         raise RuntimeError("LLM down")
 
     director.handle_player_input = boom
-    PlayerInputDispatcher(
+    disp = PlayerInputDispatcher(
         event_bus=bus, sessions=sessions, client=client,
         prompt_context=None, director=director,
-    ).start()
+    )
+    disp.start()
     bus.publish("foundry.player_input", {
         "actor_id": "a-1", "text": "hi",
     })
+    assert disp.wait_idle(timeout=2.0)
     assert len(client.events) == 1
     assert "[error" in client.events[0][1]["narration"]
     assert client.events[0][1]["commands_ok"] is False

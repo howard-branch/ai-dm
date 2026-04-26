@@ -1,0 +1,7 @@
+{
+  "type": "move_actor_to",
+  "actor_id": "Bran the Brave",
+  "target": "altar",
+  "scene_id": null
+}
+

@@ -16,10 +16,14 @@
     "scripts/socket_bridge.js",
     "scripts/chat_commands.js",
     "scripts/dm_panel.js",
-    "scripts/combat_macros.js"
+    "scripts/combat_macros.js",
+    "scripts/narration_log.js",
+    "scripts/lobby_window.js"
   ],
   "styles": [
-    "styles/dm_panel.css"
+    "styles/dm_panel.css",
+    "styles/narration_log.css",
+    "styles/lobby_window.css"
   ],
   "relationships": {
     "requires": [

@@ -1,5 +1,5 @@
-import { moveToken, spawnToken, deleteToken, readToken } from "./token_commands.js";
-import { activateScene, createScene, deleteScene, readActiveScene } from "./scene_commands.js";
+import { moveToken, moveActorTo, spawnToken, deleteToken, readToken } from "./token_commands.js";
+import { activateScene, createScene, deleteScene, readActiveScene, createNote } from "./scene_commands.js";
 import { createActor, updateActor, highlightObject, deleteActor, readActor } from "./actor_commands.js";
 
 console.log("AI DM Bridge file loaded - top of module");
@@ -66,6 +66,38 @@ export function registerInboundEvent(name, handler) {
   inboundEventHandlers.set(name, handler);
 }
 
+/**
+ * Election: returns true if THIS client is the chosen one to actually
+ * mutate world state for an event broadcast to every Foundry tab.
+ *
+ * Rule: prefer the active GM. If no GM is connected, the player with
+ * the lexicographically smallest user id wins. Every other client
+ * skips the side-effect (e.g. ChatMessage.create) — but Foundry's own
+ * server then replicates the chosen client's ChatMessage to every
+ * connected tab, so all players still SEE the narration in their
+ * chat sidebar.
+ *
+ * This avoids the two failure modes of a static rule:
+ *  - "GM-only" → pure-player sessions see nothing at all.
+ *  - "all clients" → N duplicate ChatMessages per event.
+ */
+function isElectedRenderer() {
+  const me = game?.user;
+  if (!me) return false;
+  const active = (game.users?.contents ?? game.users ?? [])
+      .filter((u) => u?.active);
+  if (!active.length) return true; // we're alone; render.
+  const gms = active.filter((u) => u.isGM);
+  if (gms.length) {
+    // Lowest-id GM wins (deterministic tiebreak).
+    gms.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+    return me.id === gms[0].id;
+  }
+  // No GM connected — lowest-id active user wins.
+  active.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  return me.id === active[0].id;
+}
+
 // Bounded LRU of recently-processed request ids so that a relay replay does
 // not run the same command twice. Cached responses are re-emitted on replay.
 const PROCESSED_LRU_LIMIT = 512;
@@ -88,11 +120,37 @@ async function handleCommand(command) {
     return { ok: false, error: "invalid_command", command_type: command?.type ?? null };
   }
 
+  const _t0 = performance.now();
+  try {
+    const result = await _dispatchCommand(command);
+    const ms = (performance.now() - _t0).toFixed(0);
+    console.log(`AI DM Bridge: ${command.type} ${result?.ok ? "ok" : "FAIL"} in ${ms}ms`);
+    return result;
+  } catch (err) {
+    const ms = (performance.now() - _t0).toFixed(0);
+    console.error(`AI DM Bridge: ${command.type} threw after ${ms}ms`, command, err);
+    return { ok: false, error: String(err), command_type: command.type };
+  }
+}
+
+async function _dispatchCommand(command) {
   try {
     switch (command.type) {
       case "move_token":
         await moveToken(command.token_id, command.x, command.y);
         return { ok: true, command_type: command.type };
+
+      case "move_actor_to": {
+        const result = await moveActorTo({
+          actor_id: command.actor_id,
+          target: command.target ?? null,
+          target_token_id: command.target_id ?? null,
+          scene_id: command.scene_id ?? null,
+          x: command.x ?? null,
+          y: command.y ?? null,
+        });
+        return { ok: true, command_type: command.type, ...result };
+      }
 
       case "update_actor":
         await updateActor(command.actor_id, command.patch || {});
@@ -116,6 +174,16 @@ async function handleCommand(command) {
         await activateScene(command.scene_id);
         return { ok: true, command_type: command.type };
 
+      case "create_note": {
+        const result = await createNote(command.scene_id, {
+          x: command.x,
+          y: command.y,
+          text: command.text,
+          icon: command.icon ?? null,
+        });
+        return { ok: true, command_type: command.type, ...result };
+      }
+
       case "spawn_token": {
         const token = await spawnToken(
             command.scene_id,
@@ -131,7 +199,7 @@ async function handleCommand(command) {
         const actor = await createActor(
             command.name,
             command.actor_type || "npc",
-            { system: command.system || null, img: command.img || null }
+            { system: command.system || null, img: command.img || null, items: command.items || [] }
         );
         return { ok: true, command_type: command.type, actorId: actor.id, actorName: actor.name };
       }
@@ -205,10 +273,15 @@ function connectRelay() {
 
   relaySocket.addEventListener("open", () => {
     console.log("AI DM Bridge relay connected");
-    relaySocket.send(JSON.stringify({
+    const hello = {
       type: "hello",
       client: "foundry",
-    }));
+      user_id: game?.user?.id ?? null,
+      user_name: game?.user?.name ?? null,
+      is_gm: !!game?.user?.isGM,
+    };
+    relaySocket.send(JSON.stringify(hello));
+    console.log("AI DM Bridge hello sent:", hello);
     flushPendingEvents();
   });
 
@@ -231,6 +304,25 @@ function connectRelay() {
         console.warn("AI DM Bridge: missing request_id, dropping", msg);
         return;
       }
+
+      // Only the GM client executes mutating commands. Foundry's relay
+      // broadcasts to every connected client; without this gate the
+      // Player browser also tries to run create_scene / activate_scene
+      // / create_actor and gets "lacks permission" errors. The GM
+      // client owns the world authority — it speaks for everyone.
+      if (!game?.user?.isGM) {
+        console.log(
+          `AI DM Bridge: ignoring ${msg.type} on non-GM client ` +
+          `(user=${game?.user?.name}, isGM=${!!game?.user?.isGM})`,
+          msg.request_id
+        );
+        return;
+      }
+      console.log(
+        `AI DM Bridge: executing ${msg.type} on GM client ` +
+        `(user=${game?.user?.name})`,
+        msg.request_id
+      );
 
       // Replay protection: re-emit cached result instead of re-executing.
       const cached = processedResults.get(msg.request_id);
@@ -320,10 +412,198 @@ Hooks.once("ready", async () => {
   };
   console.log("AI DM Bridge assigning global - done");
 
-  // Default inbound: render a narration envelope as a chat message.
+  // Default inbound: render a narration envelope.
+  // Every Foundry client appends to its own persistent narration-log
+  // window (so each player has a full transcript even with the chat
+  // sidebar collapsed). The elected client (active GM, or lowest-id
+  // player otherwise) additionally calls ``ChatMessage.create()``;
+  // Foundry's own server then replicates that ChatMessage to every
+  // tab, so the chat sidebar stays in sync with no duplicates.
   registerInboundEvent("narration", async (payload) => {
     const { renderNarration } = await import("./narration_renderer.js");
-    return renderNarration(payload);
+    return renderNarration(payload, { createChatMessage: isElectedRenderer() });
+  });
+
+  // Wipe the Foundry chat log + the per-client persistent narration
+  // log. Triggered by ``scripts/reset_state.sh`` so a fresh scenario
+  // run doesn't carry stale dialogue from the previous session.
+  registerInboundEvent("clear_chat", async () => {
+    // Every client clears its own local narration log.
+    try {
+      const { NarrationLog } = await import("./narration_log.js");
+      NarrationLog.clear();
+    } catch (err) { /* ignore */ }
+    // Only the elected (GM) client deletes the world chat — Foundry
+    // replicates the deletions to every tab.
+    if (!isElectedRenderer()) return;
+    try {
+      const ids = (game.messages?.contents ?? []).map((m) => m.id);
+      if (ids.length) {
+        await ChatMessage.deleteDocuments(ids);
+      }
+      console.log(`AI DM Bridge: cleared ${ids.length} chat message(s)`);
+    } catch (err) {
+      console.warn("AI DM Bridge: clear_chat failed", err);
+    }
+  });
+
+  // Reset Foundry world state (scenes / actors / journals / tokens
+  // created by the AI DM). Triggered by ``scripts/reset_state.sh`` so
+  // a fresh scenario run starts with a clean Foundry world. The Python
+  // side computes the names to delete from the campaign pack and
+  // sends them in the payload — we don't guess on the JS side.
+  //
+  // Payload shape:
+  //   {
+  //     scene_names:    [str, ...],   // delete by exact name match
+  //     actor_names:    [str, ...],
+  //     journal_names:  [str, ...],   // also wipes notes that pointed at them
+  //     delete_all_tokens_in_listed_scenes: bool   // default true
+  //   }
+  registerInboundEvent("reset_foundry_state", async (payload) => {
+    if (!isElectedRenderer()) return;
+    if (!game?.user?.isGM) {
+      console.warn("AI DM Bridge: reset_foundry_state ignored (not GM)");
+      return;
+    }
+    const sceneNames = new Set((payload?.scene_names || []).map((s) => String(s).toLowerCase()));
+    const actorNames = new Set((payload?.actor_names || []).map((s) => String(s).toLowerCase()));
+    const journalNames = new Set((payload?.journal_names || []).map((s) => String(s).toLowerCase()));
+    const wipeTokens = payload?.delete_all_tokens_in_listed_scenes !== false;
+    const summary = { scenes: 0, actors: 0, journals: 0, tokens: 0, notes: 0, errors: [] };
+
+    // 1. Tokens + notes inside scenes we are about to delete (so the
+    //    scene delete itself is uncluttered) AND in any matched scene.
+    try {
+      for (const scene of (game.scenes?.contents ?? [])) {
+        const matches =
+          sceneNames.has((scene.name || "").toLowerCase()) ||
+          sceneNames.has((scene.id || "").toLowerCase());
+        if (!matches) continue;
+        if (wipeTokens) {
+          const tokenIds = (scene.tokens?.contents ?? []).map((t) => t.id);
+          if (tokenIds.length) {
+            try {
+              await scene.deleteEmbeddedDocuments("Token", tokenIds);
+              summary.tokens += tokenIds.length;
+            } catch (e) { summary.errors.push(`tokens@${scene.name}: ${e.message}`); }
+          }
+        }
+        const noteIds = (scene.notes?.contents ?? []).map((n) => n.id);
+        if (noteIds.length) {
+          try {
+            await scene.deleteEmbeddedDocuments("Note", noteIds);
+            summary.notes += noteIds.length;
+          } catch (e) { summary.errors.push(`notes@${scene.name}: ${e.message}`); }
+        }
+      }
+    } catch (e) { summary.errors.push(`tokens/notes: ${e.message}`); }
+
+    // 2. Scenes by name.
+    try {
+      const sceneIds = (game.scenes?.contents ?? [])
+        .filter((s) =>
+          sceneNames.has((s.name || "").toLowerCase()) ||
+          sceneNames.has((s.id || "").toLowerCase()))
+        .map((s) => s.id);
+      if (sceneIds.length) {
+        await Scene.deleteDocuments(sceneIds);
+        summary.scenes = sceneIds.length;
+      }
+    } catch (e) { summary.errors.push(`scenes: ${e.message}`); }
+
+    // 3. Actors by name.
+    try {
+      const actorIds = (game.actors?.contents ?? [])
+        .filter((a) =>
+          actorNames.has((a.name || "").toLowerCase()) ||
+          actorNames.has((a.id || "").toLowerCase()))
+        .map((a) => a.id);
+      if (actorIds.length) {
+        await Actor.deleteDocuments(actorIds);
+        summary.actors = actorIds.length;
+      }
+    } catch (e) { summary.errors.push(`actors: ${e.message}`); }
+
+    // 4. Journal entries by name (always include the AI DM Anchors
+    //    auto-journal even if Python forgot to list it).
+    try {
+      journalNames.add("ai dm anchors");
+      const journalIds = (game.journal?.contents ?? [])
+        .filter((j) => journalNames.has((j.name || "").toLowerCase()))
+        .map((j) => j.id);
+      if (journalIds.length) {
+        await JournalEntry.deleteDocuments(journalIds);
+        summary.journals = journalIds.length;
+      }
+    } catch (e) { summary.errors.push(`journals: ${e.message}`); }
+
+    // 5. Clear the persistent log on every client too (so the new
+    //    session also starts visually clean).
+    try {
+      const { NarrationLog } = await import("./narration_log.js");
+      NarrationLog.clear();
+    } catch { /* ignore */ }
+
+    console.log("AI DM Bridge: reset_foundry_state →", summary);
+    try {
+      ui.notifications?.info(
+        `AI DM reset: ${summary.scenes} scene(s), ${summary.actors} actor(s), ` +
+        `${summary.journals} journal(s), ${summary.tokens} token(s), ${summary.notes} note(s).`
+      );
+    } catch { /* ignore */ }
+  });
+
+  // Lobby status: GM-only chat whisper showing who has joined and how
+  // to start the game (`/startgame`).
+  registerInboundEvent("lobby_status", async (payload) => {
+    const { renderLobbyStatus } = await import("./lobby_renderer.js");
+    return renderLobbyStatus(payload);
+  });
+
+  // Character-creation wizard prompt from Python. Opens a Dialog and
+  // sends the player's choices back as a wizard_response event.
+  registerInboundEvent("wizard_request", async (payload) => {
+    const { openCharacterWizard } = await import("./character_wizard.js");
+    return openCharacterWizard(payload, sendEventToPython);
+  });
+
+  // Bind a Foundry user to a freshly-created actor so the player isn't
+  // prompted to "choose a character" on next login. Only the GM client
+  // has permission to mutate user.character — non-GM clients no-op.
+  registerInboundEvent("assign_player_character", async (payload) => {
+    const userId = payload?.user_id;
+    const actorId = payload?.actor_id;
+    if (!userId || !actorId) {
+      console.warn("AI DM Bridge: assign_player_character missing ids", payload);
+      return;
+    }
+    if (!game?.user?.isGM) {
+      // Wait for the GM client to do it.
+      return;
+    }
+    const user = game.users?.get(userId);
+    const actor = game.actors?.get(actorId);
+    if (!user) {
+      console.warn("AI DM Bridge: assign_player_character — no such user", userId);
+      return;
+    }
+    if (!actor) {
+      console.warn("AI DM Bridge: assign_player_character — no such actor", actorId);
+      return;
+    }
+    try {
+      await user.update({ character: actorId });
+      // Make sure the player can actually own the character they just made.
+      const perms = foundry.utils.deepClone(actor.ownership || {});
+      perms[userId] = CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER;
+      await actor.update({ ownership: perms });
+      console.log(
+        `AI DM Bridge: bound user ${user.name} → actor ${actor.name} (${actorId})`
+      );
+    } catch (err) {
+      console.warn("AI DM Bridge: assign_player_character failed", err);
+    }
   });
 
   installInboundHooks();
