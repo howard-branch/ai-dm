@@ -1,0 +1,6 @@
+{
+  "type": "apply_healing",
+  "actor_id": "hero",
+  "amount": 8
+}
+

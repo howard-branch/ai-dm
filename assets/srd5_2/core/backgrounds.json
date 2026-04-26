@@ -1,0 +1,150 @@
+{
+  "_doc": "SRD 5.2.1 backgrounds. Each grants 3 ability-score options (player allocates +2/+1 or +1/+1/+1), 2 skill proficiencies, 1 tool proficiency, and 1 origin feat. Starting equipment is summarised; full item lookups happen against the campaign item catalog.",
+  "backgrounds": [
+    {
+      "key": "acolyte", "label": "Acolyte",
+      "ability_score_options": ["int", "wis", "cha"],
+      "feat": "magic_initiate_cleric",
+      "skill_profs": ["insight", "religion"],
+      "tool_prof": "calligraphers_supplies",
+      "language": null,
+      "starting_equipment": ["calligraphers_supplies", "holy_symbol", "prayer_book", "incense_x5", "vestments", "common_clothes", "8gp"]
+    },
+    {
+      "key": "artisan", "label": "Artisan",
+      "ability_score_options": ["str", "dex", "int"],
+      "feat": "crafter",
+      "skill_profs": ["investigation", "persuasion"],
+      "tool_prof": "__choice_artisan",
+      "language": null,
+      "starting_equipment": ["artisans_tools_choice", "merchants_scale", "duster", "common_clothes", "32gp"]
+    },
+    {
+      "key": "charlatan", "label": "Charlatan",
+      "ability_score_options": ["dex", "con", "cha"],
+      "feat": "skilled",
+      "skill_profs": ["deception", "sleight_of_hand"],
+      "tool_prof": "forgery_kit",
+      "language": null,
+      "starting_equipment": ["forgery_kit", "fine_clothes", "costume", "15gp"]
+    },
+    {
+      "key": "criminal", "label": "Criminal",
+      "ability_score_options": ["dex", "con", "int"],
+      "feat": "alert",
+      "skill_profs": ["sleight_of_hand", "stealth"],
+      "tool_prof": "thieves_tools",
+      "language": null,
+      "starting_equipment": ["crowbar", "thieves_tools", "dark_clothes", "16gp"]
+    },
+    {
+      "key": "entertainer", "label": "Entertainer",
+      "ability_score_options": ["str", "dex", "cha"],
+      "feat": "musician",
+      "skill_profs": ["acrobatics", "performance"],
+      "tool_prof": "__choice_musical",
+      "language": null,
+      "starting_equipment": ["musical_instrument_choice", "costume", "mirror", "perfume", "11gp"]
+    },
+    {
+      "key": "farmer", "label": "Farmer",
+      "ability_score_options": ["str", "con", "wis"],
+      "feat": "tough",
+      "skill_profs": ["animal_handling", "nature"],
+      "tool_prof": "carpenters_tools",
+      "language": null,
+      "starting_equipment": ["sickle", "healers_kit", "carpenters_tools", "iron_pot", "shovel", "common_clothes", "30gp"]
+    },
+    {
+      "key": "guard", "label": "Guard",
+      "ability_score_options": ["str", "int", "wis"],
+      "feat": "alert",
+      "skill_profs": ["athletics", "perception"],
+      "tool_prof": "__choice_gaming",
+      "language": null,
+      "starting_equipment": ["spear", "light_crossbow", "bolts_x20", "gaming_set_choice", "hooded_lantern", "manacles", "common_clothes", "12gp"]
+    },
+    {
+      "key": "guide", "label": "Guide",
+      "ability_score_options": ["str", "dex", "wis"],
+      "feat": "magic_initiate_druid",
+      "skill_profs": ["stealth", "survival"],
+      "tool_prof": "cartographers_tools",
+      "language": null,
+      "starting_equipment": ["shortbow", "arrows_x20", "cartographers_tools", "bedroll", "tent", "traveler's_clothes", "3gp"]
+    },
+    {
+      "key": "hermit", "label": "Hermit",
+      "ability_score_options": ["con", "wis", "cha"],
+      "feat": "healer",
+      "skill_profs": ["medicine", "religion"],
+      "tool_prof": "herbalism_kit",
+      "language": null,
+      "starting_equipment": ["herbalism_kit", "quarterstaff", "bedroll", "blanket", "lamp", "oil_x3", "common_clothes", "16gp"]
+    },
+    {
+      "key": "merchant", "label": "Merchant",
+      "ability_score_options": ["con", "int", "cha"],
+      "feat": "lucky",
+      "skill_profs": ["animal_handling", "persuasion"],
+      "tool_prof": "navigators_tools",
+      "language": null,
+      "starting_equipment": ["navigators_tools", "two_pouches", "fine_clothes", "22gp"]
+    },
+    {
+      "key": "noble", "label": "Noble",
+      "ability_score_options": ["str", "int", "cha"],
+      "feat": "skilled",
+      "skill_profs": ["history", "persuasion"],
+      "tool_prof": "__choice_gaming",
+      "language": null,
+      "starting_equipment": ["gaming_set_choice", "fine_clothes", "perfume", "signet_ring", "scroll_of_pedigree", "29gp"]
+    },
+    {
+      "key": "sage", "label": "Sage",
+      "ability_score_options": ["con", "int", "wis"],
+      "feat": "magic_initiate_wizard",
+      "skill_profs": ["arcana", "history"],
+      "tool_prof": "calligraphers_supplies",
+      "language": null,
+      "starting_equipment": ["quarterstaff", "calligraphers_supplies", "book_of_lore", "parchment_x8", "robe", "8gp"]
+    },
+    {
+      "key": "sailor", "label": "Sailor",
+      "ability_score_options": ["str", "dex", "wis"],
+      "feat": "tavern_brawler",
+      "skill_profs": ["acrobatics", "perception"],
+      "tool_prof": "navigators_tools",
+      "language": null,
+      "starting_equipment": ["dagger", "navigators_tools", "rope_50ft", "common_clothes", "20gp"]
+    },
+    {
+      "key": "scribe", "label": "Scribe",
+      "ability_score_options": ["dex", "int", "wis"],
+      "feat": "skilled",
+      "skill_profs": ["investigation", "perception"],
+      "tool_prof": "calligraphers_supplies",
+      "language": null,
+      "starting_equipment": ["calligraphers_supplies", "parchment_x12", "fine_clothes", "lamp", "oil_x3", "23gp"]
+    },
+    {
+      "key": "soldier", "label": "Soldier",
+      "ability_score_options": ["str", "dex", "con"],
+      "feat": "savage_attacker",
+      "skill_profs": ["athletics", "intimidation"],
+      "tool_prof": "__choice_gaming",
+      "language": null,
+      "starting_equipment": ["spear", "shortbow", "arrows_x20", "gaming_set_choice", "healers_kit", "common_clothes", "14gp"]
+    },
+    {
+      "key": "wayfarer", "label": "Wayfarer",
+      "ability_score_options": ["dex", "wis", "cha"],
+      "feat": "lucky",
+      "skill_profs": ["insight", "stealth"],
+      "tool_prof": "thieves_tools",
+      "language": null,
+      "starting_equipment": ["dagger_x2", "thieves_tools", "gaming_set_choice", "bedroll", "common_clothes", "16gp"]
+    }
+  ]
+}
+

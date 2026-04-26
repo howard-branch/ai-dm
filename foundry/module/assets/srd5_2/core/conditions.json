@@ -1,0 +1,146 @@
+{
+  "conditions": [
+    {
+      "key": "blinded",
+      "label": "Blinded",
+      "effects": {
+        "attacker_disadvantage": true,
+        "target_advantage": true,
+        "auto_fail_sight_checks": true
+      }
+    },
+    {
+      "key": "charmed",
+      "label": "Charmed",
+      "effects": {
+        "cant_attack_charmer": true,
+        "charmer_advantage_on_social": true
+      }
+    },
+    {
+      "key": "deafened",
+      "label": "Deafened",
+      "effects": {
+        "auto_fail_hearing_checks": true
+      }
+    },
+    {
+      "key": "frightened",
+      "label": "Frightened",
+      "effects": {
+        "attacker_disadvantage": true,
+        "ability_check_disadvantage": true,
+        "cant_move_closer_to_source": true
+      }
+    },
+    {
+      "key": "grappled",
+      "label": "Grappled",
+      "effects": {
+        "attacker_disadvantage": true,
+        "speed_zero": true
+      }
+    },
+    {
+      "key": "incapacitated",
+      "label": "Incapacitated",
+      "effects": {
+        "no_actions": true,
+        "no_bonus_actions": true,
+        "no_reactions": true
+      }
+    },
+    {
+      "key": "invisible",
+      "label": "Invisible",
+      "effects": {
+        "attacker_advantage": true,
+        "target_disadvantage": true
+      }
+    },
+    {
+      "key": "paralyzed",
+      "label": "Paralyzed",
+      "effects": {
+        "incapacitated_implied": true,
+        "speed_zero": true,
+        "auto_fail_saves": ["str", "dex"],
+        "target_advantage": true,
+        "attacks_within_5ft_crit": true
+      }
+    },
+    {
+      "key": "petrified",
+      "label": "Petrified",
+      "effects": {
+        "incapacitated_implied": true,
+        "speed_zero": true,
+        "auto_fail_saves": ["str", "dex"],
+        "target_advantage": true,
+        "resistance_all_damage": true,
+        "immune_to_poison_and_disease": true
+      }
+    },
+    {
+      "key": "poisoned",
+      "label": "Poisoned",
+      "effects": {
+        "attacker_disadvantage": true,
+        "ability_check_disadvantage": true
+      }
+    },
+    {
+      "key": "prone",
+      "label": "Prone",
+      "effects": {
+        "attacker_disadvantage": true,
+        "target_advantage_melee": true,
+        "target_disadvantage_ranged": true
+      }
+    },
+    {
+      "key": "restrained",
+      "label": "Restrained",
+      "effects": {
+        "attacker_disadvantage": true,
+        "target_advantage": true,
+        "speed_zero": true,
+        "dex_save_disadvantage": true
+      }
+    },
+    {
+      "key": "stunned",
+      "label": "Stunned",
+      "effects": {
+        "incapacitated_implied": true,
+        "speed_zero": true,
+        "auto_fail_saves": ["str", "dex"],
+        "target_advantage": true
+      }
+    },
+    {
+      "key": "unconscious",
+      "label": "Unconscious",
+      "effects": {
+        "incapacitated_implied": true,
+        "prone_implied": true,
+        "speed_zero": true,
+        "auto_fail_saves": ["str", "dex"],
+        "target_advantage": true,
+        "attacks_within_5ft_crit": true
+      }
+    },
+    {
+      "key": "exhaustion",
+      "label": "Exhaustion",
+      "stackable": true,
+      "effects": {
+        "d20_penalty_per_level": -2,
+        "speed_penalty_per_level_ft": -5,
+        "max_level": 6,
+        "death_at_max": true
+      }
+    }
+  ]
+}
+

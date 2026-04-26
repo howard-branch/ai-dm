@@ -1,0 +1,6 @@
+{
+  "type": "set_condition",
+  "actor_id": "hero",
+  "condition": "poisoned"
+}
+

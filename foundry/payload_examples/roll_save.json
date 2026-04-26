@@ -1,0 +1,8 @@
+{
+  "type": "roll_save",
+  "actor_id": "hero",
+  "ability": "wis",
+  "dc": 15,
+  "advantage": "normal"
+}
+

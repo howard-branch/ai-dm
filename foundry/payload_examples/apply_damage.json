@@ -1,0 +1,8 @@
+{
+  "type": "apply_damage",
+  "actor_id": "hero",
+  "amount": 12,
+  "damage_type": "fire",
+  "crit": false
+}
+

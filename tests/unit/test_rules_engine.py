@@ -86,3 +86,50 @@ def test_check_pass_or_fail_against_dc():
     res = e.ability_check(actor, modifier=5, dc=15)
     assert res.success == (res.total >= 15)
 
+
+def test_attack_within_5ft_of_unconscious_auto_crits():
+    """SRD 5.2.1: a hit from within 5 ft on a paralyzed/unconscious
+    target becomes a critical hit. The caller signals adjacency via
+    ``is_within_5ft``; the engine consults the target's conditions."""
+    e = _engine(seed=1)
+    attacker = ActorRuleState(actor_id="a", name="A")
+    target = ActorRuleState(
+        actor_id="t", name="T", hp=10, max_hp=10, ac=5,
+        conditions=["unconscious"],
+    )
+    atk = e.attack(attacker, target, attack_modifier=10, is_within_5ft=True)
+    assert atk.hit
+    assert atk.crit, "adjacent hit on unconscious target must crit"
+
+
+def test_attack_at_range_on_unconscious_does_not_auto_crit():
+    e = _engine(seed=1)
+    attacker = ActorRuleState(actor_id="a", name="A")
+    target = ActorRuleState(
+        actor_id="t", name="T", hp=10, max_hp=10, ac=5,
+        conditions=["unconscious"],
+    )
+    # Default is_within_5ft=False — auto-crit must NOT fire.
+    seen_non_crit_hit = False
+    for seed in range(20):
+        eng = _engine(seed=seed)
+        res = eng.attack(attacker, target, attack_modifier=10)
+        if res.hit and not res.crit:
+            seen_non_crit_hit = True
+            break
+    assert seen_non_crit_hit, "ranged hits on unconscious target must not all crit"
+
+
+def test_attack_within_5ft_of_healthy_target_does_not_auto_crit():
+    """Adjacency alone is not enough — only paralyzed/unconscious opt in."""
+    e = _engine(seed=1)
+    attacker = ActorRuleState(actor_id="a", name="A")
+    target = ActorRuleState(actor_id="t", name="T", hp=10, max_hp=10, ac=5)
+    seen_non_crit_hit = False
+    for seed in range(20):
+        eng = _engine(seed=seed)
+        res = eng.attack(attacker, target, attack_modifier=10, is_within_5ft=True)
+        if res.hit and not res.crit:
+            seen_non_crit_hit = True
+            break
+    assert seen_non_crit_hit

@@ -1,0 +1,142 @@
+{
+  "_doc": "SRD 5.2.1 species. SRD 5.2 species grant traits but no fixed ability score increases (those moved to backgrounds). Trait summaries paraphrase SRD 5.2.1 mechanics (CC-BY; see /disclaimer).",
+  "species": [
+    {
+      "key": "human", "label": "Human",
+      "size": "medium", "speed": 30, "creature_type": "humanoid",
+      "languages": ["common", "__choice_one"],
+      "traits": [
+        {"key": "resourceful",   "name": "Resourceful",   "summary": "Gain Heroic Inspiration after a long rest."},
+        {"key": "skillful",      "name": "Skillful",      "summary": "Proficiency in one skill of your choice."},
+        {"key": "versatile",     "name": "Versatile",     "summary": "Gain an Origin feat at level 1."}
+      ],
+      "subspecies": []
+    },
+    {
+      "key": "elf", "label": "Elf",
+      "size": "medium", "speed": 30, "creature_type": "humanoid",
+      "languages": ["common", "elvish"],
+      "traits": [
+        {"key": "darkvision",    "name": "Darkvision", "range_ft": 60},
+        {"key": "fey_ancestry",  "name": "Fey Ancestry",  "summary": "Advantage on saves to avoid/end charmed."},
+        {"key": "keen_senses",   "name": "Keen Senses",   "summary": "Proficient in Insight, Perception, or Survival."},
+        {"key": "trance",        "name": "Trance",        "summary": "Long rest in 4 hours; learn a cantrip and a tool/skill."}
+      ],
+      "subspecies": [
+        {"key": "high_elf", "label": "High Elf",
+         "traits": [{"key": "elven_lineage_high", "name": "Elven Lineage", "summary": "Learn Prestidigitation and a wizard cantrip; later Detect Magic & Misty Step."}]},
+        {"key": "wood_elf", "label": "Wood Elf",
+         "traits": [{"key": "elven_lineage_wood", "name": "Elven Lineage", "summary": "Druidcraft cantrip; +5 ft speed; Longstrider, Pass without Trace at higher levels."}]},
+        {"key": "drow", "label": "Drow",
+         "traits": [{"key": "elven_lineage_drow", "name": "Elven Lineage", "summary": "Dancing Lights; later Faerie Fire & Darkness; superior darkvision 120 ft."}]}
+      ]
+    },
+    {
+      "key": "dwarf", "label": "Dwarf",
+      "size": "medium", "speed": 30, "creature_type": "humanoid",
+      "languages": ["common", "dwarvish"],
+      "traits": [
+        {"key": "darkvision",      "name": "Darkvision", "range_ft": 120},
+        {"key": "dwarven_resilience","name": "Dwarven Resilience", "summary": "Resistance to poison; advantage on saves vs poisoned."},
+        {"key": "dwarven_toughness","name": "Dwarven Toughness", "summary": "+1 HP per level."},
+        {"key": "stonecunning",    "name": "Stonecunning", "summary": "Bonus action: 60-ft tremorsense for 10 min; PB uses per long rest."}
+      ],
+      "subspecies": []
+    },
+    {
+      "key": "halfling", "label": "Halfling",
+      "size": "small", "speed": 30, "creature_type": "humanoid",
+      "languages": ["common", "halfling"],
+      "traits": [
+        {"key": "brave",            "name": "Brave",            "summary": "Advantage on saves vs frightened."},
+        {"key": "halfling_nimbleness","name": "Halfling Nimbleness", "summary": "Move through space of any larger creature."},
+        {"key": "luck",             "name": "Luck",             "summary": "Reroll a natural 1 on a d20 test; use the new roll."},
+        {"key": "naturally_stealthy","name": "Naturally Stealthy", "summary": "Hide while obscured by a larger creature."}
+      ],
+      "subspecies": []
+    },
+    {
+      "key": "dragonborn", "label": "Dragonborn",
+      "size": "medium", "speed": 30, "creature_type": "humanoid",
+      "languages": ["common", "draconic"],
+      "traits": [
+        {"key": "draconic_ancestry","name": "Draconic Ancestry", "summary": "Choose dragon type; sets Breath Weapon damage type and resistance."},
+        {"key": "breath_weapon",    "name": "Breath Weapon", "summary": "Replace one attack: 15-ft cone or 30-ft line, DEX save, PB×d10 damage."},
+        {"key": "damage_resistance","name": "Damage Resistance", "summary": "Resistance to your ancestry damage type."},
+        {"key": "draconic_flight",  "name": "Draconic Flight (L5)", "summary": "Bonus action: sprout wings, fly speed = walking, 10 min, 1/long rest."}
+      ],
+      "subspecies": []
+    },
+    {
+      "key": "gnome", "label": "Gnome",
+      "size": "small", "speed": 30, "creature_type": "humanoid",
+      "languages": ["common", "gnomish"],
+      "traits": [
+        {"key": "darkvision",       "name": "Darkvision", "range_ft": 60},
+        {"key": "gnomish_cunning",  "name": "Gnomish Cunning", "summary": "Advantage on INT, WIS, CHA saves vs magic."},
+        {"key": "gnomish_lineage",  "name": "Gnomish Lineage", "summary": "Choose Forest (Minor Illusion + extra cantrip) or Rock (tinkering)."}
+      ],
+      "subspecies": [
+        {"key": "forest_gnome", "label": "Forest Gnome",
+         "traits": [{"key": "lineage_forest", "name": "Forest Lineage", "summary": "Minor Illusion cantrip; later Speak with Animals & Invisibility."}]},
+        {"key": "rock_gnome",   "label": "Rock Gnome",
+         "traits": [{"key": "lineage_rock",   "name": "Rock Lineage",   "summary": "Mending and Prestidigitation; build clockwork toys."}]}
+      ]
+    },
+    {
+      "key": "orc", "label": "Orc",
+      "size": "medium", "speed": 30, "creature_type": "humanoid",
+      "languages": ["common", "orc"],
+      "traits": [
+        {"key": "darkvision",      "name": "Darkvision", "range_ft": 120},
+        {"key": "adrenaline_rush", "name": "Adrenaline Rush", "summary": "Bonus action: Dash + temp HP = PB; PB uses per long rest."},
+        {"key": "powerful_build",  "name": "Powerful Build", "summary": "Count as one size larger for carrying capacity / push / drag / lift."},
+        {"key": "relentless_endurance","name": "Relentless Endurance", "summary": "Drop to 0 HP without dying once per long rest."}
+      ],
+      "subspecies": []
+    },
+    {
+      "key": "tiefling", "label": "Tiefling",
+      "size": "medium", "speed": 30, "creature_type": "humanoid",
+      "languages": ["common", "infernal"],
+      "traits": [
+        {"key": "darkvision",       "name": "Darkvision", "range_ft": 60},
+        {"key": "fiendish_legacy",  "name": "Fiendish Legacy", "summary": "Choose Abyssal/Chthonic/Infernal — sets Thaumaturgy variant + spells."},
+        {"key": "otherworldly_presence","name": "Otherworldly Presence", "summary": "Learn Thaumaturgy or chosen lineage cantrip."}
+      ],
+      "subspecies": [
+        {"key": "abyssal",  "label": "Abyssal Tiefling",
+         "traits": [{"key": "abyssal_legacy",  "name": "Abyssal Legacy",  "summary": "Resistance to poison; later spells include Hold Person & Stinking Cloud."}]},
+        {"key": "chthonic", "label": "Chthonic Tiefling",
+         "traits": [{"key": "chthonic_legacy", "name": "Chthonic Legacy", "summary": "Resistance to necrotic; later spells include False Life & Ray of Enfeeblement."}]},
+        {"key": "infernal", "label": "Infernal Tiefling",
+         "traits": [{"key": "infernal_legacy", "name": "Infernal Legacy", "summary": "Resistance to fire; later spells include Hellish Rebuke & Darkness."}]}
+      ]
+    },
+    {
+      "key": "aasimar", "label": "Aasimar",
+      "size": "medium", "speed": 30, "creature_type": "humanoid",
+      "languages": ["common", "celestial"],
+      "traits": [
+        {"key": "darkvision",          "name": "Darkvision", "range_ft": 60},
+        {"key": "celestial_resistance","name": "Celestial Resistance", "summary": "Resistance to necrotic and radiant."},
+        {"key": "healing_hands",       "name": "Healing Hands", "summary": "Touch heals d4 per level, 1/long rest."},
+        {"key": "light_bearer",        "name": "Light Bearer", "summary": "Know the Light cantrip."},
+        {"key": "celestial_revelation","name": "Celestial Revelation (L3)", "summary": "Choose Heavenly Wings, Inner Radiance, or Necrotic Shroud transformation."}
+      ],
+      "subspecies": []
+    },
+    {
+      "key": "goliath", "label": "Goliath",
+      "size": "medium", "speed": 35, "creature_type": "humanoid",
+      "languages": ["common", "giant"],
+      "traits": [
+        {"key": "giant_ancestry",  "name": "Giant Ancestry", "summary": "Choose a giant lineage (Cloud / Fire / Frost / Hill / Stone / Storm)."},
+        {"key": "large_form",      "name": "Large Form (L5)", "summary": "Bonus action: count as Large for 10 min; advantage on STR checks; +10 ft push, 1/long rest."},
+        {"key": "powerful_build",  "name": "Powerful Build", "summary": "Count as one size larger for carrying / push / drag / lift."}
+      ],
+      "subspecies": []
+    }
+  ]
+}
+

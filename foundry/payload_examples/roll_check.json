@@ -1,0 +1,8 @@
+{
+  "type": "roll_check",
+  "actor_id": "hero",
+  "skill": "perception",
+  "dc": 15,
+  "advantage": "advantage"
+}
+

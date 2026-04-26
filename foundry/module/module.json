@@ -14,6 +14,7 @@
   ],
   "esmodules": [
     "scripts/socket_bridge.js",
+    "scripts/srd/index.js",
     "scripts/chat_commands.js",
     "scripts/dm_panel.js",
     "scripts/combat_macros.js",

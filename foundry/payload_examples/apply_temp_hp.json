@@ -1,0 +1,6 @@
+{
+  "type": "apply_temp_hp",
+  "actor_id": "hero",
+  "amount": 5
+}
+

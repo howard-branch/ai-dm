@@ -1,0 +1,10 @@
+{
+  "max_level": 6,
+  "death_at": 6,
+  "per_level": {
+    "d20_penalty": -2,
+    "speed_penalty_ft": -5
+  },
+  "notes": "SRD 5.2 (2024) one-track exhaustion: each level imposes -2 to all d20 tests and -5 ft speed; level 6 = death."
+}
+

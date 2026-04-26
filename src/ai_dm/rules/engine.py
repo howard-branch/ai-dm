@@ -25,6 +25,7 @@ from ai_dm.rules.conditions import (
     ALL_CONDITIONS,
     AttackModifier,
     attacker_mod,
+    crit_on_5ft,
     merge_advantage,
     target_mod,
 )
@@ -170,6 +171,7 @@ class RulesEngine:
         *,
         attack_modifier: int,
         advantage: str | None = None,
+        is_within_5ft: bool = False,
     ) -> AttackResult:
         adv = self._advantage_for(attacker, target=target, override=advantage)
         eff_mod = int(attack_modifier) + _exh_d20_penalty(
@@ -181,11 +183,23 @@ class RulesEngine:
             target_ac=target.ac,
             advantage=adv,
         )
+        # SRD 5.2.1: any hit from within 5 ft against a paralyzed or
+        # unconscious target is a critical hit. Caller (CombatMachine)
+        # owns the geometry; we only flip the flags when the target's
+        # conditions opt in via `attacks_within_5ft_crit`.
+        if (
+            result.hit
+            and is_within_5ft
+            and not result.crit
+            and crit_on_5ft(target.conditions)
+        ):
+            result.crit = True
         self._publish(
             "rules.attack_resolved",
             {
                 "attacker_id": attacker.actor_id,
                 "target_id": target.actor_id,
+                "is_within_5ft": bool(is_within_5ft),
                 "result": result.to_dict(),
             },
         )

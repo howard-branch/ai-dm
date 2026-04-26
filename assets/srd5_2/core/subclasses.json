@@ -1,0 +1,135 @@
+{
+  "_doc": "SRD 5.2.1 subclasses — exactly one per class is published in the SRD. Feature summaries paraphrase SRD 5.2.1 mechanics (CC-BY; see /disclaimer).",
+  "subclasses": [
+    {
+      "key": "berserker", "class_key": "barbarian", "label": "Path of the Berserker",
+      "selectable_at": 3,
+      "features_by_level": {
+        "3":  [{"key": "frenzy", "name": "Frenzy", "summary": "While raging, bonus-action Frenzied Strike grants extra weapon attacks; gain temp HP."}],
+        "6":  [{"key": "mindless_rage", "name": "Mindless Rage", "summary": "Immunity to charmed and frightened while raging."}],
+        "10": [{"key": "intimidating_presence", "name": "Intimidating Presence", "summary": "Spend a rage use to frighten one creature within 30 ft (CHA save)."}],
+        "14": [{"key": "retaliation", "name": "Retaliation", "summary": "Reaction: melee attack vs creature that damaged you within 5 ft."}]
+      }
+    },
+    {
+      "key": "lore_bard", "class_key": "bard", "label": "College of Lore",
+      "selectable_at": 3,
+      "features_by_level": {
+        "3":  [{"key": "bonus_proficiencies", "name": "Bonus Proficiencies", "summary": "Proficiency in three skills."},
+               {"key": "cutting_words", "name": "Cutting Words", "summary": "Reaction: spend a Bardic Inspiration die to subtract from an enemy roll."}],
+        "6":  [{"key": "magical_secrets_lore", "name": "Magical Secrets", "summary": "Learn two spells from any class."}],
+        "14": [{"key": "peerless_skill", "name": "Peerless Skill", "summary": "Spend a Bardic Inspiration die on your own d20 test."}]
+      }
+    },
+    {
+      "key": "life_domain", "class_key": "cleric", "label": "Life Domain",
+      "selectable_at": 3,
+      "features_by_level": {
+        "3":  [{"key": "disciple_of_life", "name": "Disciple of Life", "summary": "Healing spells of L1+ heal extra 2 + spell level."},
+               {"key": "preserve_life_cd", "name": "Preserve Life", "summary": "Channel Divinity: distribute 5×level HP among creatures within 30 ft."}],
+        "6":  [{"key": "blessed_healer", "name": "Blessed Healer", "summary": "Healing spells also heal you for 2 + spell level."}],
+        "10": [{"key": "supreme_healing", "name": "Supreme Healing", "summary": "Maximize healing dice on cleric spells."}],
+        "17": [{"key": "incarnation_of_life", "name": "Incarnation of Life", "summary": "Bonus +5 HP per cleric level; allies regen near you."}]
+      }
+    },
+    {
+      "key": "circle_of_the_land", "class_key": "druid", "label": "Circle of the Land",
+      "selectable_at": 3,
+      "features_by_level": {
+        "3":  [{"key": "land_bonus_cantrip", "name": "Bonus Cantrip", "summary": "Learn one extra druid cantrip."},
+               {"key": "circle_spells", "name": "Circle Spells", "summary": "Always-prepared spells based on chosen land."}],
+        "6":  [{"key": "land_stride", "name": "Land's Aid", "summary": "Action: AoE healing or radiant damage."}],
+        "10": [{"key": "natures_ward", "name": "Nature's Ward", "summary": "Immune to poisoned, charmed, frightened by elementals/fey."}],
+        "14": [{"key": "natures_sanctuary", "name": "Nature's Sanctuary", "summary": "Beasts/plants must save vs WIS to attack you."}]
+      }
+    },
+    {
+      "key": "champion", "class_key": "fighter", "label": "Champion",
+      "selectable_at": 3,
+      "features_by_level": {
+        "3":  [{"key": "improved_critical", "name": "Improved Critical", "summary": "Weapon attacks score crit on 19-20."}],
+        "7":  [{"key": "remarkable_athlete", "name": "Remarkable Athlete", "summary": "Add half PB to STR/DEX/CON checks; jump farther."}],
+        "10": [{"key": "additional_fighting_style", "name": "Additional Fighting Style", "summary": "Choose a second Fighting Style."}],
+        "15": [{"key": "superior_critical", "name": "Superior Critical", "summary": "Weapon attacks score crit on 18-20."}],
+        "18": [{"key": "survivor", "name": "Survivor", "summary": "Regen 5 + CON HP each turn while bloodied."}]
+      }
+    },
+    {
+      "key": "open_hand", "class_key": "monk", "label": "Warrior of the Open Hand",
+      "selectable_at": 3,
+      "features_by_level": {
+        "3":  [{"key": "open_hand_technique", "name": "Open Hand Technique", "summary": "Flurry attacks can knock prone, push 15 ft, or impose disadv on next attack."}],
+        "6":  [{"key": "wholeness_of_body", "name": "Wholeness of Body", "summary": "Heal HP equal to martial-arts die × WIS."}],
+        "11": [{"key": "fleet_step", "name": "Fleet Step", "summary": "Bonus action: take Step of the Wind effect for free, 1/turn."}],
+        "17": [{"key": "quivering_palm", "name": "Quivering Palm", "summary": "Touch attack sets a quivering vibration; later collapse for massive necrotic damage."}]
+      }
+    },
+    {
+      "key": "devotion", "class_key": "paladin", "label": "Oath of Devotion",
+      "selectable_at": 3,
+      "features_by_level": {
+        "3":  [{"key": "devotion_spells", "name": "Oath Spells", "summary": "Always prepared list (Protection from Evil and Good, Shield of Faith, etc.)."},
+               {"key": "sacred_weapon", "name": "Sacred Weapon", "summary": "Channel Divinity: weapon adds CHA to attacks, sheds light, deals radiant."}],
+        "7":  [{"key": "aura_of_devotion", "name": "Aura of Devotion", "summary": "Allies in aura immune to charmed."}],
+        "15": [{"key": "smite_of_protection", "name": "Smite of Protection", "summary": "Half-cover bonus to allies in aura while smite is active."}],
+        "20": [{"key": "holy_nimbus", "name": "Holy Nimbus", "summary": "Bright light 30 ft; foes take radiant damage; advantage on saves vs spells."}]
+      }
+    },
+    {
+      "key": "hunter", "class_key": "ranger", "label": "Hunter",
+      "selectable_at": 3,
+      "features_by_level": {
+        "3":  [{"key": "hunters_lore", "name": "Hunter's Lore", "summary": "Hunter's Mark also reveals immunity/resistance/vulnerability."},
+               {"key": "hunters_prey", "name": "Hunter's Prey", "summary": "Choose Colossus Slayer, Horde Breaker, or Giant Killer."}],
+        "7":  [{"key": "defensive_tactics", "name": "Defensive Tactics", "summary": "Choose Escape the Horde, Multiattack Defense, or Steel Will."}],
+        "11": [{"key": "superior_hunters_defense", "name": "Multiattack", "summary": "Choose Volley or Whirlwind Attack."}],
+        "15": [{"key": "superior_hunters_defense_2", "name": "Superior Hunter's Defense", "summary": "Choose Evasion, Stand Against the Tide, or Uncanny Dodge."}]
+      }
+    },
+    {
+      "key": "thief", "class_key": "rogue", "label": "Thief",
+      "selectable_at": 3,
+      "features_by_level": {
+        "3":  [{"key": "fast_hands", "name": "Fast Hands", "summary": "Cunning Action also lets you Use an Object or use thieves' tools."},
+               {"key": "second_story_work", "name": "Second-Story Work", "summary": "Climb at full speed; running jump adds DEX in feet."}],
+        "9":  [{"key": "supreme_sneak", "name": "Supreme Sneak", "summary": "Spend Sneak-Attack die for advantage on next Stealth."}],
+        "13": [{"key": "use_magic_device", "name": "Use Magic Device", "summary": "Ignore class/race/level requirements on magic items."}],
+        "17": [{"key": "thiefs_reflexes", "name": "Thief's Reflexes", "summary": "Two turns on the first round of combat."}]
+      }
+    },
+    {
+      "key": "draconic", "class_key": "sorcerer", "label": "Draconic Sorcery",
+      "selectable_at": 3,
+      "features_by_level": {
+        "3":  [{"key": "draconic_resilience", "name": "Draconic Resilience", "summary": "+1 HP/level; AC = 10 + DEX + PB without armor."},
+               {"key": "draconic_origin_spells", "name": "Origin Spells", "summary": "Always-prepared list including Dragon's Breath."}],
+        "6":  [{"key": "elemental_affinity", "name": "Elemental Affinity", "summary": "Add CHA to one damage roll of your origin's damage type; spend 1 SP for resistance."}],
+        "14": [{"key": "dragon_wings", "name": "Dragon Wings", "summary": "Bonus action: sprout wings, fly speed = walking."}],
+        "18": [{"key": "draconic_presence", "name": "Draconic Presence", "summary": "Action + 5 SP: 60-ft aura of awe/dread, WIS save."}]
+      }
+    },
+    {
+      "key": "fiend", "class_key": "warlock", "label": "Fiend Patron",
+      "selectable_at": 3,
+      "features_by_level": {
+        "3":  [{"key": "fiend_spells", "name": "Fiend Spells", "summary": "Always-prepared list (Burning Hands, Command, Fireball, etc.)."},
+               {"key": "dark_ones_blessing", "name": "Dark One's Blessing", "summary": "Reduce a foe to 0 HP: gain CHA + warlock-level temp HP."}],
+        "6":  [{"key": "dark_ones_own_luck", "name": "Dark One's Own Luck", "summary": "Add 1d10 to an ability check or save; 2/short rest."}],
+        "10": [{"key": "fiendish_resilience", "name": "Fiendish Resilience", "summary": "Choose a damage type each rest; gain resistance."}],
+        "14": [{"key": "hurl_through_hell", "name": "Hurl Through Hell", "summary": "Hit a creature: send it through the lower planes for 10d10 psychic, 1/long rest."}]
+      }
+    },
+    {
+      "key": "evocation", "class_key": "wizard", "label": "School of Evocation",
+      "selectable_at": 3,
+      "features_by_level": {
+        "3":  [{"key": "evocation_savant", "name": "Evocation Savant", "summary": "Half cost/time to copy evocation spells into spellbook."},
+               {"key": "potent_cantrip", "name": "Potent Cantrip", "summary": "Failed save vs your cantrip → still take half damage."}],
+        "6":  [{"key": "sculpt_spells", "name": "Sculpt Spells", "summary": "Pick 1 + slot-level allies in your evocation; they auto-save and take 0 damage."}],
+        "10": [{"key": "empowered_evocation", "name": "Empowered Evocation", "summary": "Add INT mod to one damage roll of an evocation spell."}],
+        "14": [{"key": "overchannel", "name": "Overchannel", "summary": "Maximize damage of a 1st-5th level damage spell; subsequent uses cost HP."}]
+      }
+    }
+  ]
+}
+
