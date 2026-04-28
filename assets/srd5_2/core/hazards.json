@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "notes": "SRD environmental hazards. Saves use {ability, dc}. Damage is optional. Effect on fail / success encoded as semantic tokens consumed by ai_dm.rules.hazards.resolve_tick.",
+  "hazards": [
+    {
+      "key": "extreme_cold",
+      "name": "Extreme Cold",
+      "trigger": "interval",
+      "interval_unit": "hour",
+      "interval_n": 1,
+      "save": {"ability": "con", "dc": 10, "on_success": "no_effect", "on_fail": "exhaustion+1"},
+      "exempt_traits": ["resistance_cold", "immunity_cold", "cold_adapted"],
+      "description": "A creature exposed to extreme cold (below 0°F) for 1 hour without protection must succeed on a DC 10 Con save or gain a level of exhaustion."
+    },
+    {
+      "key": "extreme_heat",
+      "name": "Extreme Heat",
+      "trigger": "interval",
+      "interval_unit": "hour",
+      "interval_n": 1,
+      "save": {"ability": "con", "dc": 5, "on_success": "no_effect", "on_fail": "exhaustion+1"},
+      "scaling": {"dc_per_prior_hour": 5},
+      "exempt_traits": ["resistance_fire", "immunity_fire", "heat_adapted"],
+      "description": "A creature in temperatures above 100°F must succeed on a Con save (DC 5, +5 per previous hour) at the end of each hour or gain a level of exhaustion."
+    },
+    {
+      "key": "high_altitude",
+      "name": "High Altitude",
+      "trigger": "interval",
+      "interval_unit": "hour",
+      "interval_n": 1,
+      "save": null,
+      "on_tick": "exhaustion+1_if_unacclimated",
+      "exempt_traits": ["altitude_acclimated"],
+      "description": "Travelling above 10,000 ft each hour counts as 2 hours; after 30 days a creature becomes acclimated."
+    },
+    {
+      "key": "suffocation",
+      "name": "Suffocation",
+      "trigger": "interval",
+      "interval_unit": "round",
+      "interval_n": 1,
+      "save": null,
+      "on_tick": "drop_to_zero_after_breath",
+      "description": "A creature can hold its breath for 1+Con-mod minutes (min 30 sec). When out of breath it drops to 0 HP at the start of its next turn."
+    },
+    {
+      "key": "falling",
+      "name": "Falling",
+      "trigger": "on_event",
+      "interval_unit": "round",
+      "interval_n": 0,
+      "save": null,
+      "damage": {"dice_per_10ft": "1d6", "max_dice": 20, "type": "bludgeoning"},
+      "description": "1d6 bludgeoning per 10 ft fallen, max 20d6; creature lands prone unless it took 0 damage."
+    },
+    {
+      "key": "lava",
+      "name": "Lava",
+      "trigger": "while_in",
+      "interval_unit": "round",
+      "interval_n": 1,
+      "save": null,
+      "damage": {"dice": "10d10", "type": "fire"},
+      "exempt_traits": ["resistance_fire", "immunity_fire"],
+      "description": "10d10 fire damage per round of immersion."
+    },
+    {
+      "key": "drowning",
+      "name": "Drowning",
+      "trigger": "interval",
+      "interval_unit": "round",
+      "interval_n": 1,
+      "save": null,
+      "on_tick": "drop_to_zero_after_breath",
+      "description": "When a creature runs out of breath underwater it drops to 0 HP and starts dying."
+    }
+  ]
+}
+

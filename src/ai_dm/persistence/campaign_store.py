@@ -56,6 +56,7 @@ class CampaignSnapshot(BaseModel):
     fired_once_ids: list = Field(default_factory=list)
     foundry_journals: dict = Field(default_factory=dict)
     actor_state: dict = Field(default_factory=dict)
+    clock: dict = Field(default_factory=dict)
 
 
 @dataclass
@@ -74,6 +75,7 @@ class CampaignStore:
     triggers: Any = None
     foundry_journals: dict[str, Any] | None = None
     actor_state: dict[str, Any] | None = None
+    clock: Any = None  # ai_dm.game.clock.Clock — typed loosely to avoid an import cycle
 
     def __post_init__(self) -> None:
         self.base = Path(self.base)
@@ -114,6 +116,7 @@ class CampaignStore:
             fired_once_ids=list(self.triggers.snapshot()) if self.triggers else [],
             foundry_journals=dict(self.foundry_journals or {}),
             actor_state=dict(self.actor_state or {}),
+            clock=self.clock.snapshot() if self.clock else {},
         )
 
     def save(self) -> Path:
@@ -164,6 +167,8 @@ class CampaignStore:
         if self.actor_state is not None:
             self.actor_state.clear()
             self.actor_state.update(snap.actor_state or {})
+        if self.clock is not None and snap.clock:
+            self.clock.restore(snap.clock)
 
     # ------------------------------------------------------------------ #
 

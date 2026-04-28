@@ -137,6 +137,10 @@ class CommandRouter:
                     scene_id=raw.scene_id,
                     x=x,
                     y=y,
+                    distance_ft=raw.distance_ft,
+                    direction=raw.direction,
+                    formation_index=raw.formation_index,
+                    formation_count=raw.formation_count,
                 ).model_dump()
 
             if raw.type == "activate_scene":

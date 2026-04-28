@@ -1,0 +1,11 @@
+{
+  "type": "move_actor_to",
+  "actor_id": "pc_human",
+  "target": "altar",
+  "scene_id": "chapel",
+  "distance_ft": 30,
+  "direction": "toward",
+  "formation_index": 0,
+  "formation_count": 1
+}
+

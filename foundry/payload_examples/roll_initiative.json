@@ -1,0 +1,9 @@
+{
+  "type": "roll_initiative",
+  "encounter_id": "enc_001",
+  "rolls": [
+    {"actor_id": "pc_alice", "roll": 17, "modifier": 3},
+    {"actor_id": "npc_goblin_1", "roll": 9, "modifier": 2}
+  ]
+}
+

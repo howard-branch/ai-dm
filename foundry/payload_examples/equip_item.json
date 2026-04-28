@@ -1,0 +1,8 @@
+{
+  "type": "equip_item",
+  "actor_id": "pc_morgana",
+  "instance_id": "longsword#1",
+  "slot": "main_hand",
+  "two_handed": false
+}
+

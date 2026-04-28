@@ -182,6 +182,18 @@ function _matchScore(name, want, wantWords) {
  * the target server-side so callers don't need to know Foundry's
  * internal token ids.
  *
+ * Movement extensions:
+ *   distance_ft       — partial move ("30 ft toward the altar"). The
+ *                       token stops short along the line from its
+ *                       current position to the resolved target.
+ *   direction         — "toward" / "away" / cardinal ("north", "ne").
+ *                       When no target is given, projects from the
+ *                       token's current position in the cardinal
+ *                       direction by ``distance_ft``.
+ *   formation_index/  — slot in a multi-actor party move so members
+ *   formation_count     fan out into a ring around the destination
+ *                       instead of stacking on one tile.
+ *
  * Returns { ok, tokenId, actorId, fromX, fromY, x, y, target } or throws.
  */
 export async function moveActorTo({
@@ -191,6 +203,10 @@ export async function moveActorTo({
   scene_id = null,
   x = null,
   y = null,
+  distance_ft = null,
+  direction = null,
+  formation_index = null,
+  formation_count = null,
 } = {}) {
   const scene = resolveScene(scene_id);
   if (!scene) throw new Error(`Scene not found: ${scene_id ?? "<current>"}`);
@@ -202,6 +218,10 @@ export async function moveActorTo({
     );
   }
 
+  const gridSize = scene.grid?.size ?? scene.grid ?? 100;
+  const feetPerGrid = scene.grid?.distance ?? 5;
+  const pxPerFoot = gridSize / Math.max(1, feetPerGrid);
+
   let destX = null;
   let destY = null;
   let resolvedFrom = null;
@@ -210,6 +230,24 @@ export async function moveActorTo({
     destX = x;
     destY = y;
     resolvedFrom = "explicit_xy";
+  } else if (
+    !target && !target_token_id &&
+    Number.isFinite(distance_ft) && distance_ft > 0 &&
+    typeof direction === "string" && direction
+  ) {
+    // Cardinal-only move ("advance 15 ft north"). Project from the
+    // token's current position along the direction unit vector.
+    const myCenterX = myToken.x + ((myToken.width || 1) * gridSize) / 2;
+    const myCenterY = myToken.y + ((myToken.height || 1) * gridSize) / 2;
+    const [ux, uy] = _cardinalUnit(direction);
+    if (ux === 0 && uy === 0) {
+      throw new Error(`move_actor_to: unknown direction ${JSON.stringify(direction)}`);
+    }
+    let cx = myCenterX + ux * Number(distance_ft) * pxPerFoot;
+    let cy = myCenterY + uy * Number(distance_ft) * pxPerFoot;
+    destX = Math.round((cx - ((myToken.width || 1) * gridSize) / 2) / gridSize) * gridSize;
+    destY = Math.round((cy - ((myToken.height || 1) * gridSize) / 2) / gridSize) * gridSize;
+    resolvedFrom = `direction:${direction}`;
   } else {
     let targetInfo = null;
     if (target_token_id) {
@@ -224,27 +262,14 @@ export async function moveActorTo({
       if (targetInfo) resolvedFrom = `name:${target}`;
     }
     if (!targetInfo) {
-      // Help the player diagnose why their "/act move to X" did
-      // nothing: list the names the GM client could actually have
-      // matched against. Otherwise the failure is silent except for
-      // the bridge timing log.
-      const tokenNames = (scene.tokens ?? [])
-          .map((t) => t.name)
-          .filter(Boolean);
-      const noteNames = (scene.notes ?? [])
-          .map((n) => n.text || n.label)
-          .filter(Boolean);
+      const tokenNames = (scene.tokens ?? []).map((t) => t.name).filter(Boolean);
+      const noteNames = (scene.notes ?? []).map((n) => n.text || n.label).filter(Boolean);
       console.warn(
         `AI DM Bridge: move_actor_to could not resolve target ` +
         `${target ?? target_token_id ?? "(none)"} on scene ${scene.id}. ` +
         `Tokens: [${tokenNames.join(", ")}]. Notes: [${noteNames.join(", ")}].`
       );
-      // Include the available names in the error itself so the Python
-      // side can surface them back to the player in chat — otherwise
-      // they only show up in the GM browser's devtools console.
-      const available = [...tokenNames, ...noteNames]
-          .filter(Boolean)
-          .slice(0, 12);
+      const available = [...tokenNames, ...noteNames].filter(Boolean).slice(0, 12);
       const availStr = available.length
           ? ` available: ${available.join(", ")}`
           : " no named tokens or notes on this scene";
@@ -254,29 +279,81 @@ export async function moveActorTo({
       );
     }
 
-    // Place ourselves adjacent to the target, on the side closer to us.
-    const gridSize = scene.grid?.size ?? scene.grid ?? 100;
+    // Anchor: target's centre.
     const tgtCenterX = targetInfo.x + ((targetInfo.width || 1) * gridSize) / 2;
     const tgtCenterY = targetInfo.y + ((targetInfo.height || 1) * gridSize) / 2;
     const myCenterX = myToken.x + ((myToken.width || 1) * gridSize) / 2;
     const myCenterY = myToken.y + ((myToken.height || 1) * gridSize) / 2;
-    const dx = myCenterX - tgtCenterX;
-    const dy = myCenterY - tgtCenterY;
-    const off = gridSize;
-    if (Math.abs(dx) >= Math.abs(dy)) {
-      destX = targetInfo.x + (dx >= 0 ? (targetInfo.width || 1) * gridSize : -((myToken.width || 1) * gridSize));
-      destY = targetInfo.y;
+
+    const isPartial = Number.isFinite(distance_ft) && distance_ft > 0;
+    const isAway = (typeof direction === "string") && /^(away|back)/i.test(direction);
+
+    let baseCenterX;
+    let baseCenterY;
+
+    if (isPartial) {
+      // Project along the line from the actor to the target by
+      // ``distance_ft``, clamped to the segment endpoint. ``away`` flips
+      // the sign so "back 10 ft from the goblin" walks away from it.
+      const dx = tgtCenterX - myCenterX;
+      const dy = tgtCenterY - myCenterY;
+      const segPx = Math.hypot(dx, dy);
+      let stepPx = Number(distance_ft) * pxPerFoot;
+      if (isAway) stepPx = -stepPx;
+      let t = segPx > 0 ? Math.min(1.0, Math.abs(stepPx) / segPx) : 0;
+      if (stepPx < 0) t = -Math.abs(stepPx) / Math.max(segPx, 1);
+      baseCenterX = myCenterX + dx * t;
+      baseCenterY = myCenterY + dy * t;
+    } else if (Number.isFinite(formation_count) && formation_count > 1) {
+      // Multi-actor party move: every member is laid out around the
+      // *target's centre*, not "the side of the target nearest to
+      // me". Without this, all members compute the same closest side
+      // (because they started bunched together) and stack on a
+      // single tile — that's the reported "everyone lands on
+      // exactly the same spot" bug.
+      baseCenterX = tgtCenterX;
+      baseCenterY = tgtCenterY;
     } else {
-      destX = targetInfo.x;
-      destY = targetInfo.y + (dy >= 0 ? (targetInfo.height || 1) * gridSize : -((myToken.height || 1) * gridSize));
+      // Singleton arrive-at-target: place adjacent to the target on
+      // the side closer to us (legacy behaviour).
+      const dx = myCenterX - tgtCenterX;
+      const dy = myCenterY - tgtCenterY;
+      let bx;
+      let by;
+      if (Math.abs(dx) >= Math.abs(dy)) {
+        bx = targetInfo.x + (dx >= 0
+            ? (targetInfo.width || 1) * gridSize + ((myToken.width || 1) * gridSize) / 2
+            : -((myToken.width || 1) * gridSize) / 2);
+        by = targetInfo.y + ((targetInfo.height || 1) * gridSize) / 2;
+      } else {
+        bx = targetInfo.x + ((targetInfo.width || 1) * gridSize) / 2;
+        by = targetInfo.y + (dy >= 0
+            ? (targetInfo.height || 1) * gridSize + ((myToken.height || 1) * gridSize) / 2
+            : -((myToken.height || 1) * gridSize) / 2);
+      }
+      baseCenterX = bx;
+      baseCenterY = by;
     }
-    // Snap to grid.
-    destX = Math.round(destX / off) * off;
-    destY = Math.round(destY / off) * off;
-    // Clamp to scene bounds.
-    destX = Math.max(0, Math.min(destX, (scene.width || 0) - off));
-    destY = Math.max(0, Math.min(destY, (scene.height || 0) - off));
+
+    // Apply per-member formation offset (in grid cells) so party
+    // moves spread out.
+    if (Number.isFinite(formation_count) && formation_count > 1
+        && Number.isFinite(formation_index) && formation_index > 0) {
+      const [ox, oy] = _formationOffset(formation_index);
+      baseCenterX += ox * gridSize;
+      baseCenterY += oy * gridSize;
+    }
+
+    // Convert centre → token top-left and snap to grid.
+    destX = Math.round((baseCenterX - ((myToken.width || 1) * gridSize) / 2) / gridSize) * gridSize;
+    destY = Math.round((baseCenterY - ((myToken.height || 1) * gridSize) / 2) / gridSize) * gridSize;
   }
+
+  // Clamp to scene bounds (leave room for the token footprint).
+  const tokW = (myToken.width || 1) * gridSize;
+  const tokH = (myToken.height || 1) * gridSize;
+  destX = Math.max(0, Math.min(destX, Math.max(0, (scene.width || 0) - tokW)));
+  destY = Math.max(0, Math.min(destY, Math.max(0, (scene.height || 0) - tokH)));
 
   const fromX = myToken.x;
   const fromY = myToken.y;
@@ -297,6 +374,55 @@ export async function moveActorTo({
     target,
     resolvedFrom,
   };
+}
+
+// Cardinal direction → unit vector. Foundry y grows downward, so
+// north = -y. Diagonal entries use unit components; 5e's "every
+// diagonal counts as 5 ft" rule means we don't divide by √2 here.
+function _cardinalUnit(direction) {
+  const d = String(direction || "").toLowerCase().trim();
+  const map = {
+    north: [0, -1], n: [0, -1], up: [0, -1],
+    south: [0, 1],  s: [0, 1],  down: [0, 1],
+    east:  [1, 0],  e: [1, 0],  right: [1, 0],
+    west:  [-1, 0], w: [-1, 0], left: [-1, 0],
+    northeast: [1, -1],  ne: [1, -1],
+    northwest: [-1, -1], nw: [-1, -1],
+    southeast: [1, 1],   se: [1, 1],
+    southwest: [-1, 1],  sw: [-1, 1],
+  };
+  return map[d] ?? [0, 0];
+}
+
+// Per-index offset (in grid cells) for a multi-actor party arrival.
+// Index 0 is the centre (the lead PC); the rest spiral outward in a
+// ring pattern so no two members land on the same tile.
+const _FORMATION_RING = [
+  [0, 0],
+  [1, 0], [-1, 0], [0, 1], [0, -1],
+  [1, 1], [-1, 1], [1, -1], [-1, -1],
+  [2, 0], [-2, 0], [0, 2], [0, -2],
+  [2, 1], [-2, 1], [2, -1], [-2, -1],
+  [1, 2], [-1, 2], [1, -2], [-1, -2],
+  [2, 2], [-2, 2], [2, -2], [-2, -2],
+];
+function _formationOffset(index) {
+  const i = Math.max(0, Math.floor(index));
+  if (i < _FORMATION_RING.length) return _FORMATION_RING[i];
+  // Fallback: outward ring at radius r, walking the perimeter.
+  let consumed = _FORMATION_RING.length;
+  let r = 3;
+  while (true) {
+    const ring = [];
+    for (let dx = -r; dx <= r; dx++) {
+      for (let dy = -r; dy <= r; dy++) {
+        if (Math.abs(dx) === r || Math.abs(dy) === r) ring.push([dx, dy]);
+      }
+    }
+    if (i < consumed + ring.length) return ring[i - consumed];
+    consumed += ring.length;
+    r += 1;
+  }
 }
 
 export async function spawnToken(sceneId, actorId, x, y, name = null) {

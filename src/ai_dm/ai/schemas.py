@@ -34,6 +34,16 @@ class Command(BaseModel):
     target: str | None = None  # anchor or zone name
     x: int | None = None
     y: int | None = None
+    # Movement extensions:
+    #   distance_ft   — partial move ("30 ft toward altar")
+    #   direction     — "toward" / "away" / cardinal ("north", "ne")
+    #   formation_index / formation_count — slot in a multi-actor
+    #     party move so members fan out into a ring instead of
+    #     stacking on the destination tile.
+    distance_ft: int | None = None
+    direction: str | None = None
+    formation_index: int | None = None
+    formation_count: int | None = None
     patch: dict = Field(default_factory=dict)
 
 

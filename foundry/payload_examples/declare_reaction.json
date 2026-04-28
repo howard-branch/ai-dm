@@ -1,0 +1,8 @@
+{
+  "type": "declare_reaction",
+  "encounter_id": "enc_001",
+  "reactor_id": "pc_alice",
+  "kind": "opportunity_attack",
+  "trigger": {"actor_id": "npc_goblin_1", "from": [120, 80], "to": [200, 80]}
+}
+

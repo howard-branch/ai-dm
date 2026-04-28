@@ -1,0 +1,9 @@
+{
+  "ability": "dex",
+  "tie_break": "dex_mod_then_random",
+  "round_start": 1,
+  "surprise": {
+    "skip_first_turn": true
+  }
+}
+

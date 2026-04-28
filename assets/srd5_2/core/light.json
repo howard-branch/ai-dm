@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "notes": "SRD light sources, vision and obscurement. Radii are bright/dim in feet; duration in minutes (null = permanent).",
+  "vision_levels": ["bright", "dim", "darkness"],
+  "obscurement_levels": ["clear", "lightly", "heavily"],
+  "darkvision_dim_to_bright": true,
+  "light_sources": [
+    {"key": "candle",          "name": "Candle",          "bright_ft": 5,  "dim_ft": 10, "duration_min": 60,  "consumable": true,  "fuel": null,        "spell": false, "shape": "radius"},
+    {"key": "torch",           "name": "Torch",           "bright_ft": 20, "dim_ft": 40, "duration_min": 60,  "consumable": true,  "fuel": null,        "spell": false, "shape": "radius"},
+    {"key": "lantern_hooded",  "name": "Hooded Lantern",  "bright_ft": 30, "dim_ft": 60, "duration_min": 360, "consumable": false, "fuel": "oil_flask", "spell": false, "shape": "radius"},
+    {"key": "lantern_bullseye","name": "Bullseye Lantern","bright_ft": 60, "dim_ft": 120,"duration_min": 360, "consumable": false, "fuel": "oil_flask", "spell": false, "shape": "cone"},
+    {"key": "light_spell",     "name": "Light",           "bright_ft": 20, "dim_ft": 40, "duration_min": 60,  "consumable": false, "fuel": null,        "spell": true,  "shape": "radius"},
+    {"key": "daylight_spell",  "name": "Daylight",        "bright_ft": 60, "dim_ft": 120,"duration_min": 60,  "consumable": false, "fuel": null,        "spell": true,  "shape": "radius"}
+  ]
+}
+

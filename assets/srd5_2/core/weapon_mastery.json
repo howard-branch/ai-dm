@@ -1,0 +1,22 @@
+{
+  "_doc": "2024 SRD 5.2 Weapon Mastery properties. Each weapon in weapons.json has at most one mastery slug. Class progression lists how many mastery weapons a class may use simultaneously at each level (the 'mastery_choices' map on an actor's Inventory pins which weapons currently consume a mastery slot).",
+  "masteries": [
+    {"key": "cleave",  "label": "Cleave",  "trigger": "on_hit_melee_heavy", "effect": "On a hit with a Heavy melee weapon, you can deal weapon-die damage to a second creature within 5 ft of the original target and within your reach. Once per turn."},
+    {"key": "graze",   "label": "Graze",   "trigger": "on_miss_melee",      "effect": "On a miss with a melee attack, deal damage equal to your attack-ability modifier (min 0) of the weapon's damage type."},
+    {"key": "nick",    "label": "Nick",    "trigger": "on_attack_action",   "effect": "When you make the extra attack of the Light property, you can do so as part of the Attack action instead of as a bonus action; only once per turn."},
+    {"key": "push",    "label": "Push",    "trigger": "on_hit",             "effect": "On a hit, you can push a Large or smaller target up to 10 ft in a straight line away from you."},
+    {"key": "sap",     "label": "Sap",     "trigger": "on_hit",             "effect": "On a hit, the target has disadvantage on its next attack roll before the start of your next turn."},
+    {"key": "slow",    "label": "Slow",    "trigger": "on_hit",             "effect": "On a hit that deals damage, the target's speed is reduced by 10 ft until the start of your next turn (no stacking)."},
+    {"key": "topple",  "label": "Topple",  "trigger": "on_hit",             "effect": "On a hit, the target must make a Constitution save (DC 8 + your attack-ability mod + your Proficiency Bonus) or have the Prone condition."},
+    {"key": "vex",     "label": "Vex",     "trigger": "on_hit",             "effect": "On a hit that deals damage, you have advantage on your next attack roll against that target before the end of your next turn."}
+  ],
+  "class_progression": {
+    "barbarian": {"1": 2, "4": 3, "10": 3},
+    "fighter":   {"1": 3, "4": 4, "10": 5, "16": 6},
+    "monk":      {"1": 2, "4": 3, "10": 3},
+    "paladin":   {"1": 2, "4": 3, "10": 3},
+    "ranger":    {"1": 2, "4": 3, "10": 3},
+    "rogue":     {"1": 2, "4": 3, "10": 3}
+  }
+}
+

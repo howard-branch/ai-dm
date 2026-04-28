@@ -1,0 +1,44 @@
+{
+  "_doc": "SRD 5.2.1 tools, gaming sets, musical instruments and kits. proficiency_group keys group like-tools for proficiency lookup. ability_default suggests the SRD ability score that the tool's checks usually use (overridable per situation).",
+  "tools": [
+    {"key": "alchemists_supplies",  "name": "Alchemist's Supplies",   "category": "artisan", "cost": {"amount": 50, "unit": "gp"}, "weight": 8, "proficiency_group": "alchemists_supplies", "ability_default": "int"},
+    {"key": "brewers_supplies",     "name": "Brewer's Supplies",      "category": "artisan", "cost": {"amount": 20, "unit": "gp"}, "weight": 9, "proficiency_group": "brewers_supplies",    "ability_default": "int"},
+    {"key": "calligraphers_supplies","name": "Calligrapher's Supplies","category": "artisan","cost": {"amount": 10, "unit": "gp"}, "weight": 5, "proficiency_group": "calligraphers_supplies","ability_default": "dex"},
+    {"key": "carpenters_tools",     "name": "Carpenter's Tools",      "category": "artisan", "cost": {"amount": 8,  "unit": "gp"}, "weight": 6, "proficiency_group": "carpenters_tools",    "ability_default": "str"},
+    {"key": "cartographers_tools",  "name": "Cartographer's Tools",   "category": "artisan", "cost": {"amount": 15, "unit": "gp"}, "weight": 6, "proficiency_group": "cartographers_tools", "ability_default": "wis"},
+    {"key": "cobblers_tools",       "name": "Cobbler's Tools",        "category": "artisan", "cost": {"amount": 5,  "unit": "gp"}, "weight": 5, "proficiency_group": "cobblers_tools",      "ability_default": "dex"},
+    {"key": "cooks_utensils",       "name": "Cook's Utensils",        "category": "artisan", "cost": {"amount": 1,  "unit": "gp"}, "weight": 8, "proficiency_group": "cooks_utensils",      "ability_default": "wis"},
+    {"key": "glassblowers_tools",   "name": "Glassblower's Tools",    "category": "artisan", "cost": {"amount": 30, "unit": "gp"}, "weight": 5, "proficiency_group": "glassblowers_tools",  "ability_default": "con"},
+    {"key": "jewelers_tools",       "name": "Jeweler's Tools",        "category": "artisan", "cost": {"amount": 25, "unit": "gp"}, "weight": 2, "proficiency_group": "jewelers_tools",      "ability_default": "int"},
+    {"key": "leatherworkers_tools", "name": "Leatherworker's Tools",  "category": "artisan", "cost": {"amount": 5,  "unit": "gp"}, "weight": 5, "proficiency_group": "leatherworkers_tools","ability_default": "dex"},
+    {"key": "masons_tools",         "name": "Mason's Tools",          "category": "artisan", "cost": {"amount": 10, "unit": "gp"}, "weight": 8, "proficiency_group": "masons_tools",        "ability_default": "str"},
+    {"key": "painters_supplies",    "name": "Painter's Supplies",     "category": "artisan", "cost": {"amount": 10, "unit": "gp"}, "weight": 5, "proficiency_group": "painters_supplies",   "ability_default": "wis"},
+    {"key": "potters_tools",        "name": "Potter's Tools",         "category": "artisan", "cost": {"amount": 10, "unit": "gp"}, "weight": 3, "proficiency_group": "potters_tools",       "ability_default": "dex"},
+    {"key": "smiths_tools",         "name": "Smith's Tools",          "category": "artisan", "cost": {"amount": 20, "unit": "gp"}, "weight": 8, "proficiency_group": "smiths_tools",        "ability_default": "str"},
+    {"key": "tinkers_tools",        "name": "Tinker's Tools",         "category": "artisan", "cost": {"amount": 50, "unit": "gp"}, "weight": 10,"proficiency_group": "tinkers_tools",       "ability_default": "dex"},
+    {"key": "weavers_tools",        "name": "Weaver's Tools",         "category": "artisan", "cost": {"amount": 1,  "unit": "gp"}, "weight": 5, "proficiency_group": "weavers_tools",       "ability_default": "dex"},
+    {"key": "woodcarvers_tools",    "name": "Woodcarver's Tools",     "category": "artisan", "cost": {"amount": 1,  "unit": "gp"}, "weight": 5, "proficiency_group": "woodcarvers_tools",   "ability_default": "dex"},
+
+    {"key": "dice_set",             "name": "Dice Set",               "category": "gaming",  "cost": {"amount": 1,  "unit": "sp"}, "weight": 0,  "proficiency_group": "dice_set",           "ability_default": "wis"},
+    {"key": "playing_card_set",     "name": "Playing Card Set",       "category": "gaming",  "cost": {"amount": 5,  "unit": "sp"}, "weight": 0,  "proficiency_group": "playing_card_set",   "ability_default": "wis"},
+
+    {"key": "bagpipes",             "name": "Bagpipes",               "category": "musical", "cost": {"amount": 30, "unit": "gp"}, "weight": 6,  "proficiency_group": "bagpipes",           "ability_default": "cha"},
+    {"key": "drum",                 "name": "Drum",                   "category": "musical", "cost": {"amount": 6,  "unit": "gp"}, "weight": 3,  "proficiency_group": "drum",               "ability_default": "cha"},
+    {"key": "dulcimer",             "name": "Dulcimer",               "category": "musical", "cost": {"amount": 25, "unit": "gp"}, "weight": 10, "proficiency_group": "dulcimer",           "ability_default": "cha"},
+    {"key": "flute",                "name": "Flute",                  "category": "musical", "cost": {"amount": 2,  "unit": "gp"}, "weight": 1,  "proficiency_group": "flute",              "ability_default": "cha"},
+    {"key": "horn",                 "name": "Horn",                   "category": "musical", "cost": {"amount": 3,  "unit": "gp"}, "weight": 2,  "proficiency_group": "horn",               "ability_default": "cha"},
+    {"key": "lute",                 "name": "Lute",                   "category": "musical", "cost": {"amount": 35, "unit": "gp"}, "weight": 2,  "proficiency_group": "lute",               "ability_default": "cha"},
+    {"key": "lyre",                 "name": "Lyre",                   "category": "musical", "cost": {"amount": 30, "unit": "gp"}, "weight": 2,  "proficiency_group": "lyre",               "ability_default": "cha"},
+    {"key": "pan_flute",            "name": "Pan Flute",              "category": "musical", "cost": {"amount": 12, "unit": "gp"}, "weight": 2,  "proficiency_group": "pan_flute",          "ability_default": "cha"},
+    {"key": "shawm",                "name": "Shawm",                  "category": "musical", "cost": {"amount": 2,  "unit": "gp"}, "weight": 1,  "proficiency_group": "shawm",              "ability_default": "cha"},
+    {"key": "viol",                 "name": "Viol",                   "category": "musical", "cost": {"amount": 30, "unit": "gp"}, "weight": 1,  "proficiency_group": "viol",               "ability_default": "cha"},
+
+    {"key": "disguise_kit",         "name": "Disguise Kit",           "category": "kit",     "cost": {"amount": 25, "unit": "gp"}, "weight": 3,  "proficiency_group": "disguise_kit",       "ability_default": "cha"},
+    {"key": "forgery_kit",          "name": "Forgery Kit",            "category": "kit",     "cost": {"amount": 15, "unit": "gp"}, "weight": 5,  "proficiency_group": "forgery_kit",        "ability_default": "dex"},
+    {"key": "herbalism_kit",        "name": "Herbalism Kit",          "category": "kit",     "cost": {"amount": 5,  "unit": "gp"}, "weight": 3,  "proficiency_group": "herbalism_kit",      "ability_default": "int"},
+    {"key": "navigators_tools",     "name": "Navigator's Tools",      "category": "kit",     "cost": {"amount": 25, "unit": "gp"}, "weight": 2,  "proficiency_group": "navigators_tools",   "ability_default": "wis"},
+    {"key": "poisoners_kit",        "name": "Poisoner's Kit",         "category": "kit",     "cost": {"amount": 50, "unit": "gp"}, "weight": 2,  "proficiency_group": "poisoners_kit",      "ability_default": "int"},
+    {"key": "thieves_tools",        "name": "Thieves' Tools",         "category": "kit",     "cost": {"amount": 25, "unit": "gp"}, "weight": 1,  "proficiency_group": "thieves_tools",      "ability_default": "dex"}
+  ]
+}
+

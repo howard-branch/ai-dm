@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "notes": "SRD travel pace + forced march. per_minute_ft / per_hour_mi / per_day_mi from the PHB Travel Pace table.",
+  "paces": {
+    "slow":   {"per_minute_ft": 200, "per_hour_mi": 2, "per_day_mi": 18, "stealth_ok": true,  "perception_penalty": 0,  "navigation_dc_mod": 0},
+    "normal": {"per_minute_ft": 300, "per_hour_mi": 3, "per_day_mi": 24, "stealth_ok": false, "perception_penalty": 0,  "navigation_dc_mod": 0},
+    "fast":   {"per_minute_ft": 400, "per_hour_mi": 4, "per_day_mi": 30, "stealth_ok": false, "perception_penalty": -5, "navigation_dc_mod": 5}
+  },
+  "forced_march": {
+    "hours_before_check": 8,
+    "save_dc_base": 10,
+    "dc_per_extra_hour": 1,
+    "save_ability": "con",
+    "exhaustion_on_fail": 1
+  },
+  "terrain_multipliers": {
+    "normal": 1.0,
+    "road": 1.0,
+    "difficult": 0.5,
+    "mountain": 0.5,
+    "swamp": 0.5,
+    "forest": 0.75
+  },
+  "mount_speed_factor": 2.0,
+  "default_travel_hours_per_day": 8
+}
+

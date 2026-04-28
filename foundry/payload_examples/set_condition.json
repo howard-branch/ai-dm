@@ -1,6 +1,17 @@
 {
   "type": "set_condition",
   "actor_id": "hero",
-  "condition": "poisoned"
+  "condition": "poisoned",
+  "source": "spell:ray_of_sickness",
+  "duration_rounds": 10,
+  "expires_on": "end_of_target_turn",
+  "save_to_end": {
+    "ability": "con",
+    "dc": 13,
+    "when": "end_of_turn",
+    "once_per_turn": true
+  },
+  "concentration_link": null,
+  "notes": "Spell save DC 13"
 }
 

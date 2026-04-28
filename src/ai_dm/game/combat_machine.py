@@ -22,6 +22,9 @@ from ai_dm.game.combat_state import (
     Participant,
 )
 from ai_dm.orchestration.event_bus import EventBus
+from ai_dm.rules import initiative as _initiative
+from ai_dm.rules import turn as _turn
+from ai_dm.rules.dice import DiceRoller
 
 logger = logging.getLogger("ai_dm.combat")
 
@@ -79,10 +82,24 @@ class CombatMachine:
     def roll_initiative(self) -> list[Participant]:
         s = self._require_state()
         self._transition("rolling_initiative")
+        roller = DiceRoller(rng=self.rng)
+        rolls: list[_initiative.InitiativeRoll] = []
         for p in s.participants:
+            mod = int(getattr(p, "initiative_bonus", 0) or 0)
             if p.initiative is None:
-                p.initiative = self.rng.randint(1, 20)
-        s.participants.sort(key=lambda p: (-(p.initiative or 0), p.name))
+                r = _initiative.roll_initiative(
+                    p.actor_id, roller=roller, modifier=mod, dex_mod=mod,
+                )
+                p.initiative = r.total
+                rolls.append(r)
+            else:
+                rolls.append(_initiative.InitiativeRoll(
+                    actor_id=p.actor_id, roll=p.initiative - mod,
+                    modifier=mod, total=p.initiative, dex_mod=mod,
+                ))
+        order = _initiative.sort_order(rolls, rng=self.rng)
+        rank = {aid: i for i, aid in enumerate(order)}
+        s.participants.sort(key=lambda p: rank.get(p.actor_id, 1_000_000))
         s.current_index = 0
         self._publish(
             "combat.initiative_rolled",
@@ -150,6 +167,16 @@ class CombatMachine:
 
     def end_turn(self) -> Participant | None:
         s = self._require_state()
+        # Fire SRD end-of-turn hook on the actor whose turn just ended,
+        # before we advance the index. Publishes a `combat.turn_ended`
+        # event so subscribers (concentration ticks, condition timers)
+        # can react.
+        if 0 <= s.current_index < len(s.participants):
+            actor = s.participants[s.current_index]
+            report = _turn.end_of_turn(actor)
+            self._publish("combat.turn_ended", {
+                "actor_id": actor.actor_id, "round": s.round, **report,
+            })
         self._transition("in_round")
         s.current_index += 1
         if s.current_index >= len(s.participants):

@@ -1,0 +1,8 @@
+{
+  "type": "grapple",
+  "actor_id": "pc_alice",
+  "target_id": "npc_goblin_1",
+  "attacker_modifier": 4,
+  "defender_modifier": 2
+}
+

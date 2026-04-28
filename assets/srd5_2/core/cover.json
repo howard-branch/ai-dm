@@ -1,0 +1,9 @@
+{
+  "levels": [
+    {"key": "none", "ac": 0, "save": 0, "blocks": false},
+    {"key": "half", "ac": 2, "save": 2, "blocks": false},
+    {"key": "three_quarters", "ac": 5, "save": 5, "blocks": false},
+    {"key": "total", "ac": null, "save": null, "blocks": true}
+  ]
+}
+

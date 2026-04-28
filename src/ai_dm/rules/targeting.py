@@ -6,35 +6,44 @@ how many actors, points, or areas a single cast can affect — and
 :class:`ResolvedTargets` (the list of actor ids the spell hits, plus
 the anchor for any AoE).
 
-MVP scope (``kind`` values fully implemented):
+Supported ``kind`` values:
 
-* ``"self"``   — the caster only.
-* ``"single"`` — exactly one creature picked by ``intent.target_id``.
-* ``"radius"`` — every creature within ``radius_ft`` of an anchor
-  (caster, target actor, or explicit ``ctx["anchor"]``).
+* ``"self"``    — the caster only.
+* ``"single"``  — exactly one creature picked by ``intent.target_id``.
+* ``"multi"``   — an explicit list of creatures (capped by
+  ``max_targets``) drawn from ``intent.extra["target_ids"]`` /
+  ``ctx["target_ids"]``.
+* ``"point"``   — no actors; just resolves the map anchor for the
+  caller (e.g. *fog cloud*'s drop point).
+* ``"radius"``  — every creature within ``radius_ft`` of an anchor
+  (alias of ``sphere`` for grid-agnostic catalog entries).
+* ``"sphere"``  — same as ``radius``, anchored at a point/target.
+* ``"cube"``    — axis-aligned cube of side ``size_ft`` from an origin.
+* ``"cone"``    — 5e cone of length ``size_ft`` (or ``length_ft``)
+  emanating from the caster/anchor along ``direction_deg``.
+* ``"line"``    — line of length ``size_ft`` (or ``length_ft``) and
+  ``width_ft`` along ``direction_deg``.
 
-The other shapes (``cone``, ``line``, ``sphere``, ``cube``, ``point``,
-``multi``) are reserved as known kinds — they parse and round-trip
-through the schema, but :func:`resolve_targets` returns
-``ResolvedTargets`` with ``error="unsupported"`` so the resolver can
-fail soft instead of crashing on a future spell card.
+For the AoE shapes (``radius``/``sphere``/``cube``/``cone``/``line``),
+``resolve_targets`` will:
+
+1. honour ``ctx["affected_ids"]`` when present (caller-supplied list);
+2. otherwise expand geometrically over ``ctx["candidate_ids"]`` using
+   the helpers in :mod:`ai_dm.rules.areas_of_effect`, converting via
+   ``ctx["pixels_per_foot"]``;
+3. fall back to anchor-only output when neither is available, so the
+   caller can fan out the AoE later.
 
 Geometry caveat
 ---------------
-``CombatantState.position`` is in Foundry pixel coords, but ``radius_ft``
-is in feet. For radius resolution we therefore prefer:
-
-1. ``ctx["affected_ids"]`` — caller-supplied list (canonical).
-2. Otherwise iterate ``actor_lookup`` candidates (``ctx["candidate_ids"]``)
-   and keep those within ``radius_ft`` once converted via
-   ``ctx["pixels_per_foot"]`` (defaulting to 1.0 ft/px when absent).
-
-Anything fancier (cone/line geometry, scene-aware grids) lives in a
-later milestone.
+``CombatantState.position`` is stored in Foundry pixel coords, but
+catalog distances are in feet. AoE expansion converts via
+``ctx["pixels_per_foot"]`` (skipped, with anchor-only output, when
+absent). The geometry primitives themselves live in
+:mod:`ai_dm.rules.areas_of_effect`.
 """
 from __future__ import annotations
 
-import math
 import re
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal
@@ -44,14 +53,13 @@ from pydantic import BaseModel, ConfigDict
 TargetKind = Literal[
     "self",
     "single",
-    "radius",
-    # Reserved (parse OK, resolve unsupported).
     "multi",
     "point",
-    "cone",
-    "line",
+    "radius",
     "sphere",
     "cube",
+    "cone",
+    "line",
 ]
 
 AnchorKind = Literal["caster", "target", "point"]
@@ -68,6 +76,11 @@ class TargetSpec(BaseModel):
     kind: TargetKind = "single"
     range_ft: int | None = None
     radius_ft: int | None = None
+    # Geometric size for cube/cone/line (feet). ``length_ft`` is an
+    # alias accepted by ``from_catalog`` for the same field.
+    size_ft: int | None = None
+    width_ft: int | None = None  # line width; defaults via AoE helper
+    direction_deg: float | None = None  # cone/line orientation
     max_targets: int | None = None
     # For radius/sphere/cube/point/cone/line — where the shape is anchored.
     # ``"caster"`` (self), ``"target"`` (the chosen creature), or
@@ -95,6 +108,11 @@ class TargetSpec(BaseModel):
             # Tolerate legacy `kind` synonyms.
             kind = str(data.get("kind", "single")).lower().strip()
             data["kind"] = _CANONICAL_KIND.get(kind, kind)
+            # ``length_ft`` is an alias of ``size_ft`` for cone/line.
+            if "length_ft" in data and "size_ft" not in data:
+                data["size_ft"] = data.pop("length_ft")
+            else:
+                data.pop("length_ft", None)
             if data["kind"] == "self":
                 data.setdefault("self_only", True)
                 data.setdefault("anchor", "caster")
@@ -120,6 +138,53 @@ class TargetSpec(BaseModel):
         anchor: AnchorKind = "target",
     ) -> "TargetSpec":
         return cls(kind="radius", radius_ft=radius_ft, range_ft=range_ft, anchor=anchor)
+
+    @classmethod
+    def sphere(
+        cls, radius_ft: int, *, range_ft: int | None = None,
+        anchor: AnchorKind = "point",
+    ) -> "TargetSpec":
+        return cls(kind="sphere", radius_ft=radius_ft, range_ft=range_ft, anchor=anchor)
+
+    @classmethod
+    def cube(
+        cls, side_ft: int, *, range_ft: int | None = None,
+        anchor: AnchorKind = "point",
+    ) -> "TargetSpec":
+        return cls(kind="cube", size_ft=side_ft, range_ft=range_ft, anchor=anchor)
+
+    @classmethod
+    def cone(
+        cls, length_ft: int, *, range_ft: int | None = None,
+        anchor: AnchorKind = "caster", direction_deg: float | None = None,
+    ) -> "TargetSpec":
+        return cls(
+            kind="cone", size_ft=length_ft, range_ft=range_ft,
+            anchor=anchor, direction_deg=direction_deg,
+        )
+
+    @classmethod
+    def line(
+        cls, length_ft: int, *, width_ft: int | None = None,
+        range_ft: int | None = None, anchor: AnchorKind = "caster",
+        direction_deg: float | None = None,
+    ) -> "TargetSpec":
+        return cls(
+            kind="line", size_ft=length_ft, width_ft=width_ft,
+            range_ft=range_ft, anchor=anchor, direction_deg=direction_deg,
+        )
+
+    @classmethod
+    def multi(
+        cls, max_targets: int, *, range_ft: int | None = None,
+    ) -> "TargetSpec":
+        return cls(kind="multi", max_targets=max_targets, range_ft=range_ft)
+
+    @classmethod
+    def point(
+        cls, *, range_ft: int | None = None,
+    ) -> "TargetSpec":
+        return cls(kind="point", range_ft=range_ft, anchor="point")
 
 
 _CANONICAL_KIND: dict[str, str] = {
@@ -244,6 +309,104 @@ def _anchor_point(
 # --------------------------------------------------------------------- #
 
 
+def _resolve_aoe(
+    spec: TargetSpec,
+    *,
+    kind: str,
+    caster: Any,
+    intent: Any,
+    ctx: dict,
+    actor_lookup: Callable[[str], Any] | None,
+) -> ResolvedTargets:
+    """Shared expansion path for radius/sphere/cube/cone/line.
+
+    Dispatches to the geometry helpers in
+    :mod:`ai_dm.rules.areas_of_effect` once we have an anchor, the
+    candidate ids, and a pixels-per-foot conversion. Falls back to
+    ``ctx["affected_ids"]`` (caller-supplied list), or to an
+    anchor-only result that downstream code can fan out later.
+    """
+    from ai_dm.rules.areas_of_effect import (
+        points_in_cone,
+        points_in_cube,
+        points_in_line,
+        points_in_sphere,
+    )
+
+    anchor_xy = _anchor_point(
+        spec, caster=caster, intent=intent, ctx=ctx, actor_lookup=actor_lookup,
+    )
+    anchor_payload: dict[str, Any] | None = None
+    if anchor_xy is not None:
+        anchor_payload = {"x": anchor_xy[0], "y": anchor_xy[1]}
+        if isinstance(ctx.get("anchor"), dict) and "scene_id" in ctx["anchor"]:
+            anchor_payload["scene_id"] = ctx["anchor"]["scene_id"]
+
+    # Caller-supplied list short-circuits geometry.
+    affected = ctx.get("affected_ids")
+    if isinstance(affected, list) and affected:
+        ids = [str(a) for a in affected]
+        return ResolvedTargets(spec=spec, actor_ids=ids, anchor=anchor_payload)
+
+    # Geometric expansion (best-effort, only when we have everything).
+    candidates = ctx.get("candidate_ids")
+    ppf = float(ctx.get("pixels_per_foot") or 0.0)
+    size_ft = spec.size_ft
+    radius_ft = spec.radius_ft if spec.radius_ft is not None else size_ft
+    direction_deg = float(
+        spec.direction_deg
+        if spec.direction_deg is not None
+        else ctx.get("direction_deg", 0.0)
+    )
+
+    if (
+        anchor_xy is not None
+        and isinstance(candidates, list)
+        and actor_lookup is not None
+        and ppf > 0.0
+    ):
+        # Build (id, position-in-feet) pairs for the candidates.
+        anchor_ft = (anchor_xy[0] / ppf, anchor_xy[1] / ppf)
+        cand_pts: list[tuple[str, tuple[float, float]]] = []
+        for cid in candidates:
+            cand = actor_lookup(str(cid))
+            cpos = _position_of(cand)
+            if cpos is None:
+                continue
+            cand_pts.append((str(cid), (cpos[0] / ppf, cpos[1] / ppf)))
+        pts = [p for _, p in cand_pts]
+
+        hit_pts: list[tuple[float, float]] = []
+        if kind in ("radius", "sphere") and radius_ft:
+            hit_pts = points_in_sphere(pts, center=anchor_ft, radius_ft=float(radius_ft))
+        elif kind == "cube" and size_ft:
+            hit_pts = points_in_cube(pts, origin=anchor_ft, side_ft=float(size_ft))
+        elif kind == "cone" and size_ft:
+            hit_pts = points_in_cone(
+                pts, apex=anchor_ft, length_ft=float(size_ft),
+                direction_deg=direction_deg,
+            )
+        elif kind == "line" and size_ft:
+            hit_pts = points_in_line(
+                pts, origin=anchor_ft, length_ft=float(size_ft),
+                direction_deg=direction_deg,
+                width_ft=float(spec.width_ft) if spec.width_ft is not None else None,
+            )
+
+        hit_set = {p for p in hit_pts}
+        ids = [cid for cid, p in cand_pts if p in hit_set]
+        return ResolvedTargets(spec=spec, actor_ids=ids, anchor=anchor_payload)
+
+    # Anchor-only fallback — caller fan-outs the AoE later.
+    target_id = _intent_field(intent, "target_id") or ctx.get("target_id")
+    if anchor_payload is None and not target_id:
+        return ResolvedTargets(
+            spec=spec, actor_ids=[],
+            success=False, error=f"{kind} spell needs an anchor or target_id",
+        )
+    return ResolvedTargets(spec=spec, actor_ids=[], anchor=anchor_payload)
+
+
 def resolve_targets(
     spec: TargetSpec,
     *,
@@ -289,54 +452,49 @@ def resolve_targets(
             )
         return ResolvedTargets(spec=spec, actor_ids=[str(target_id)])
 
-    if kind == "radius":
+    if kind == "multi":
+        ids_in: list[Any] = []
+        # Prefer explicit list on the intent / ctx.
+        extra = _intent_field(intent, "extra") or {}
+        if isinstance(extra, dict) and isinstance(extra.get("target_ids"), list):
+            ids_in = list(extra["target_ids"])
+        elif isinstance(ctx.get("target_ids"), list):
+            ids_in = list(ctx["target_ids"])
+        elif target_id:
+            ids_in = [target_id]
+        ids = [str(a) for a in ids_in if a]
+        if spec.max_targets is not None:
+            ids = ids[: spec.max_targets]
+        if not ids:
+            return ResolvedTargets(
+                spec=spec, actor_ids=[],
+                success=False, error="multi-target spell requires target_ids",
+            )
+        return ResolvedTargets(spec=spec, actor_ids=ids)
+
+    if kind == "point":
+        # Pure map-anchor selection — no actor expansion. Caller will
+        # fan out the AoE template (e.g. fog cloud) over the scene.
         anchor_xy = _anchor_point(
             spec, caster=actor, intent=intent, ctx=ctx, actor_lookup=actor_lookup,
         )
-        anchor_payload: dict[str, Any] | None = None
-        if anchor_xy is not None:
-            anchor_payload = {"x": anchor_xy[0], "y": anchor_xy[1]}
-            if isinstance(ctx.get("anchor"), dict) and "scene_id" in ctx["anchor"]:
-                anchor_payload["scene_id"] = ctx["anchor"]["scene_id"]
-
-        # Caller-supplied list short-circuits geometry.
-        affected = ctx.get("affected_ids")
-        if isinstance(affected, list) and affected:
-            ids = [str(a) for a in affected]
-            return ResolvedTargets(spec=spec, actor_ids=ids, anchor=anchor_payload)
-
-        # Geometric expansion (best-effort, only when we have everything).
-        radius_ft = spec.radius_ft
-        candidates = ctx.get("candidate_ids")
-        ppf = float(ctx.get("pixels_per_foot") or 0.0)
-        if (
-            anchor_xy is not None
-            and radius_ft
-            and isinstance(candidates, list)
-            and actor_lookup is not None
-            and ppf > 0.0
-        ):
-            radius_px = radius_ft * ppf
-            ids: list[str] = []
-            for cid in candidates:
-                cand = actor_lookup(str(cid))
-                cpos = _position_of(cand)
-                if cpos is None:
-                    continue
-                dx, dy = cpos[0] - anchor_xy[0], cpos[1] - anchor_xy[1]
-                if math.hypot(dx, dy) <= radius_px:
-                    ids.append(str(cid))
-            return ResolvedTargets(spec=spec, actor_ids=ids, anchor=anchor_payload)
-
-        # Anchor-only result — caller will fan out the AoE later.
-        if anchor_payload is None and not target_id:
+        if anchor_xy is None:
             return ResolvedTargets(
                 spec=spec, actor_ids=[],
-                success=False, error="radius spell needs an anchor or target_id",
+                success=False, error="point-targeted spell requires an anchor",
             )
+        anchor_payload: dict[str, Any] = {"x": anchor_xy[0], "y": anchor_xy[1]}
+        if isinstance(ctx.get("anchor"), dict) and "scene_id" in ctx["anchor"]:
+            anchor_payload["scene_id"] = ctx["anchor"]["scene_id"]
         return ResolvedTargets(spec=spec, actor_ids=[], anchor=anchor_payload)
 
-    # Reserved-but-unimplemented shapes.
+    if kind in ("radius", "sphere", "cube", "cone", "line"):
+        return _resolve_aoe(
+            spec, kind=kind, caster=actor, intent=intent, ctx=ctx,
+            actor_lookup=actor_lookup,
+        )
+
+    # Fallback for any future kind we haven't taught the resolver yet.
     return ResolvedTargets(
         spec=spec, actor_ids=[],
         success=False,

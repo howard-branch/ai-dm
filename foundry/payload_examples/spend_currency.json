@@ -1,0 +1,6 @@
+{
+  "type": "spend_currency",
+  "actor_id": "pc_morgana",
+  "coins": {"gp": 50, "sp": 5}
+}
+

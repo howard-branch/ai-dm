@@ -24,6 +24,7 @@ from ai_dm.rules.attack import (
 from ai_dm.rules.conditions import (
     ALL_CONDITIONS,
     AttackModifier,
+    _extract_keys,
     attacker_mod,
     crit_on_5ft,
     merge_advantage,
@@ -55,6 +56,22 @@ from ai_dm.rules.skill_checks import CheckResult, make_check
 logger = logging.getLogger("ai_dm.rules")
 
 
+def _has_key(conditions, key: str, *, source: str | None = None) -> bool:
+    """Mixed-shape membership: works on list[str] or list[ConditionInstance]."""
+    norm = key.strip().lower()
+    for c in conditions or ():
+        if isinstance(c, str):
+            if c.strip().lower() == norm and source is None:
+                return True
+        else:
+            ck = getattr(c, "key", None)
+            csrc = getattr(c, "source", None)
+            if isinstance(ck, str) and ck.strip().lower() == norm:
+                if source is None or csrc == source:
+                    return True
+    return False
+
+
 @dataclass
 class ActorRuleState:
     """Mechanical snapshot of an actor used by the rules engine.
@@ -69,7 +86,7 @@ class ActorRuleState:
     max_hp: int = 0
     temp_hp: int = 0
     ac: int = 10
-    conditions: list[str] = None  # type: ignore[assignment]
+    conditions: list = None  # type: ignore[assignment]
     resistances: list[str] = None  # type: ignore[assignment]
     vulnerabilities: list[str] = None  # type: ignore[assignment]
     immunities: list[str] = None  # type: ignore[assignment]
@@ -87,6 +104,17 @@ class ActorRuleState:
             self.immunities = []
         if self.death_saves is None:
             self.death_saves = DeathSaveTrack()
+
+    # ------------------------------------------------------------------ #
+    # Conditions: tolerate either bare strings (legacy / tests) or
+    # ConditionInstance objects without forcing one shape on callers.
+    # ------------------------------------------------------------------ #
+
+    def condition_keys(self) -> set[str]:
+        return _extract_keys(self.conditions)
+
+    def has_condition(self, key: str) -> bool:
+        return key.strip().lower() in self.condition_keys()
 
 
 class RulesEngine:
@@ -268,7 +296,7 @@ class RulesEngine:
             if is_massive_damage(int(amount), target.max_hp):
                 target.death_saves.dead = True  # type: ignore[union-attr]
         elif outcome.dropped_to_zero:
-            if "unconscious" not in target.conditions:
+            if not _has_key(target.conditions, "unconscious"):
                 self.add_condition(target, "unconscious")
             if is_massive_damage(outcome.dealt, target.max_hp):
                 target.death_saves.dead = True  # type: ignore[union-attr]
@@ -279,7 +307,7 @@ class RulesEngine:
             return target.hp
         was_at_zero = target.hp == 0
         new_hp = _apply_healing(target, int(amount))
-        if new_hp > 0 and "unconscious" in target.conditions:
+        if new_hp > 0 and _has_key(target.conditions, "unconscious"):
             self.remove_condition(target, "unconscious")
         if was_at_zero and new_hp > 0 and target.death_saves is not None:
             target.death_saves.reset()
@@ -298,7 +326,7 @@ class RulesEngine:
         result = _roll_death_save(actor.death_saves, self.roller)
         if result.healed_to is not None:
             actor.hp = max(actor.hp, int(result.healed_to))
-            if "unconscious" in actor.conditions:
+            if _has_key(actor.conditions, "unconscious"):
                 self.remove_condition(actor, "unconscious")
         self._publish(
             "rules.death_save",
@@ -330,23 +358,57 @@ class RulesEngine:
     # Conditions
     # ------------------------------------------------------------------ #
 
-    def add_condition(self, actor: ActorRuleState, condition: str) -> None:
+    def add_condition(self, actor: ActorRuleState, condition: str,
+                      *, source: str = "rules", **kwargs) -> None:
         if condition not in ALL_CONDITIONS:
             logger.warning("unknown condition %r — accepting as custom tag", condition)
-        if condition not in actor.conditions:
-            actor.conditions.append(condition)
+        if _has_key(actor.conditions, condition, source=source):
+            return
+        # If the actor is a full CombatantState, route through its
+        # tracker so cascades / implications fire correctly.
+        if hasattr(actor, "add_condition") and callable(getattr(actor, "add_condition")):
+            try:
+                actor.add_condition(condition, source=source, **kwargs)  # type: ignore[attr-defined]
+            except Exception:  # noqa: BLE001
+                actor.conditions.append(condition)  # type: ignore[arg-type]
             self._publish(
                 "rules.condition_added",
-                {"actor_id": actor.actor_id, "condition": condition},
+                {"actor_id": actor.actor_id, "condition": condition, "source": source},
             )
+            return
+        # Legacy ActorRuleState shape: keep list[str] semantics.
+        actor.conditions.append(condition)  # type: ignore[arg-type]
+        self._publish(
+            "rules.condition_added",
+            {"actor_id": actor.actor_id, "condition": condition, "source": source},
+        )
 
-    def remove_condition(self, actor: ActorRuleState, condition: str) -> None:
-        if condition in actor.conditions:
-            actor.conditions.remove(condition)
-            self._publish(
-                "rules.condition_removed",
-                {"actor_id": actor.actor_id, "condition": condition},
-            )
+    def remove_condition(self, actor: ActorRuleState, condition: str,
+                         *, source: str | None = None) -> None:
+        if not _has_key(actor.conditions, condition, source=source):
+            return
+        if hasattr(actor, "remove_condition") and callable(getattr(actor, "remove_condition")):
+            try:
+                actor.remove_condition(condition, source=source)  # type: ignore[attr-defined]
+            except Exception:  # noqa: BLE001
+                pass
+        else:
+            kept = []
+            for c in actor.conditions:
+                if isinstance(c, str):
+                    if c == condition:
+                        continue
+                else:
+                    ck = getattr(c, "key", None)
+                    csrc = getattr(c, "source", None)
+                    if ck == condition and (source is None or csrc == source):
+                        continue
+                kept.append(c)
+            actor.conditions = kept
+        self._publish(
+            "rules.condition_removed",
+            {"actor_id": actor.actor_id, "condition": condition, "source": source},
+        )
 
     # ------------------------------------------------------------------ #
     # Internals

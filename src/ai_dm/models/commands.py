@@ -36,6 +36,19 @@ class MoveActorToCommand(BaseCommand):
     scene_id: str | None = None
     x: int | None = None
     y: int | None = None
+    # Partial / directional move support. ``distance_ft`` caps how
+    # far the token travels along the direction implied by ``target``
+    # (``toward``/``away``) or by ``direction`` (cardinal). ``direction``
+    # is also accepted standalone (no target) for "advance 15 ft north".
+    distance_ft: int | None = None
+    direction: str | None = None
+    # Formation slot for multi-actor party moves. The Foundry-side
+    # mover applies offsets in *grid cells* around the resolved
+    # destination so members occupy distinct tiles instead of
+    # stacking on the target. ``formation_index`` is 0-based; the
+    # leader is index 0 and lands on the centre.
+    formation_index: int | None = None
+    formation_count: int | None = None
 
 
 class ActivateSceneCommand(BaseCommand):
@@ -84,6 +97,13 @@ class CreateActorCommand(BaseCommand):
     # feats) to embed under the actor immediately after creation. Each
     # entry is a dict shaped like {name, type, system: {...}}.
     items: list[dict] = Field(default_factory=list)
+    # Extra registry aliases to attach to the created/resolved actor on
+    # the Python side (e.g. the canonical pack id "pc_human"). The JS
+    # bridge ignores this field; it exists so downstream commands like
+    # ``move_actor_to(actor_id="pc_human")`` can be resolved by the
+    # validator instead of being passed through verbatim and failing
+    # in Foundry with ``no token for actor pc_human in scene …``.
+    aliases: list[str] = Field(default_factory=list)
 
 
 # ------------------------------------------------------------------ #

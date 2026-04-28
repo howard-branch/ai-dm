@@ -1,0 +1,7 @@
+{
+  "trigger": "leaves_reach_without_disengage",
+  "uses": "reaction",
+  "advantage": "normal",
+  "blockers": ["disengaging", "incapacitated", "speed_zero"]
+}
+

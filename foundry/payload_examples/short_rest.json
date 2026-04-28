@@ -1,0 +1,7 @@
+{
+  "type": "short_rest",
+  "actor_id": "pc_alice",
+  "hit_dice_spent": {"d8": 2},
+  "con_modifier": 2
+}
+

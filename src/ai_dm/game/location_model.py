@@ -83,4 +83,15 @@ class SceneLocation(BaseModel):
     scene_id: str
     anchors: list[Anchor] = Field(default_factory=list)
     zones: list[Zone] = Field(default_factory=list)
+    # Pixels per grid square (Foundry default 100). Used to translate
+    # in-fiction feet into pixel coordinates so partial moves
+    # ("30 feet toward the altar") and party formations land on
+    # distinct, sensible tiles instead of stacking on the anchor.
+    grid_size_px: int = 100
+    # Feet per grid square (D&D 5e default 5).
+    feet_per_grid: int = 5
+
+    def pixels_per_foot(self) -> float:
+        feet = max(1, int(self.feet_per_grid or 5))
+        return float(self.grid_size_px or 100) / float(feet)
 

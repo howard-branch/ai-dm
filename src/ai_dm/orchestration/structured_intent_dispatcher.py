@@ -23,7 +23,7 @@ from ai_dm.ai.intent_schemas import PlayerIntent
 
 logger = logging.getLogger("ai_dm.orchestration.structured_intent_dispatcher")
 
-_INTENT_VERBS = {"attack", "skill_check", "move", "interact", "speak", "use_item", "cast_spell"}
+_INTENT_VERBS = {"attack", "skill_check", "move", "travel", "interact", "speak", "use_item", "cast_spell"}
 _COMBAT_VERBS = {"dash", "dodge", "end_turn"}
 
 

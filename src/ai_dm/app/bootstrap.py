@@ -21,6 +21,10 @@ from ai_dm.app.container import Container, ContainerConfig
 from ai_dm.app.lobby import wait_for_lobby_ready
 from ai_dm.app.opening_scene import build_opening_envelope
 from ai_dm.app.runtime import Runtime
+from ai_dm.app.scene_setup import (
+    build_anchor_pin_commands as _scene_anchor_pin_commands,
+    build_create_scene as _scene_build_create_scene,
+)
 from ai_dm.app.settings import Settings
 from ai_dm.campaign.pack import CampaignPack, resolve_pack, seed_characters
 from ai_dm.game.state_store import StateStore
@@ -81,17 +85,46 @@ def build_runtime(settings: Settings | None = None) -> Runtime:
     # the wizard can be driven through the live Foundry browser session
     # rather than the local terminal. The relay supervisor + socket
     # bridge are already up by this point.
-    pending_user_bind = _maybe_run_character_wizard(pack, container)
+    pending_user_bind, wizard_sheet = _maybe_run_character_wizard(pack, container)
 
     # Inject the active player character into the prompt context so the
     # narrator knows who's speaking. Pulled from the manifest's
     # ``start.player_character`` and the live character sheet (seeded
     # on first run by the container build, or freshly written by the
-    # remote wizard above).
+    # remote wizard above). If the wizard just ran in this process we
+    # prefer its in-memory sheet so a transient disk read failure can
+    # never leave the runtime announcing "[no player character loaded]".
     pc_id = (pack.manifest.start or {}).get("player_character")
-    pc_sheet = _load_character_sheet(pack, pc_id) if pc_id else None
+    pc_sheet: dict | None = None
+    if pc_id:
+        pc_sheet = _load_character_sheet(pack, pc_id)
+        if pc_sheet is None and wizard_sheet is not None:
+            pc_sheet = wizard_sheet
+            logger.info(
+                "using freshly-built wizard sheet for %s (disk load returned None)",
+                pc_id,
+            )
     if pc_sheet and container.prompt_context is not None:
         container.prompt_context.character = pc_sheet
+    elif container.prompt_context is not None:
+        # Diagnostic: explain *why* the runtime banner is about to say
+        # "[no player character loaded]". Without this the user only
+        # sees the symptom.
+        if not pc_id:
+            logger.warning(
+                "no character loaded: campaign manifest has no start.player_character; "
+                "the runtime will start without a bound PC."
+            )
+        else:
+            live = sheet_path(pack, pc_id)
+            seed = pack.paths.characters_seed / f"{pc_id}.json"
+            logger.warning(
+                "no character loaded for pc_id=%s — neither the live sheet (%s, exists=%s) "
+                "nor the seed (%s, exists=%s) could be read. The runtime banner will say "
+                "'[no player character loaded]'. If the Foundry wizard just ran, check "
+                "the previous logs for 'character wizard write failed'.",
+                pc_id, live, live.exists(), seed, seed.exists(),
+            )
 
     # Inject the rest of the party so the narrator can answer
     # "who is in my party". Excludes the active PC (already in `character`).
@@ -147,7 +180,9 @@ def build_runtime(settings: Settings | None = None) -> Runtime:
 # --------------------------------------------------------------------- #
 
 
-def _maybe_run_character_wizard(pack: CampaignPack, container: Container) -> str | None:
+def _maybe_run_character_wizard(
+    pack: CampaignPack, container: Container,
+) -> tuple[str | None, dict | None]:
     """Run the guided character creator if the active pack has no PC sheet.
 
     Forced on with ``AI_DM_NEW_CHARACTER=1``. Skipped if the manifest has
@@ -155,20 +190,26 @@ def _maybe_run_character_wizard(pack: CampaignPack, container: Container) -> str
     Drives the wizard through the connected Foundry browser by default;
     falls back to the legacy stdin wizard when ``AI_DM_LOCAL_WIZARD=1``.
 
-    Returns the Foundry user id of the player who answered the remote
-    wizard, so the caller can bind ``user.character`` after the actor
-    is created. Returns ``None`` for the local wizard, when no wizard
-    ran, or when the player cancelled.
+    Returns ``(user_id, sheet)``:
+
+      * ``user_id`` — Foundry user id of the player who answered the
+        remote wizard so the caller can bind ``user.character`` after
+        the actor is created. ``None`` for the local wizard, when no
+        wizard ran, or when the player cancelled.
+      * ``sheet`` — the freshly built sheet (already persisted to disk)
+        so the caller can wire ``prompt_context.character`` directly,
+        bypassing any transient disk-read hiccup. ``None`` when no
+        wizard ran or it produced no sheet.
     """
     pc_id = (pack.manifest.start or {}).get("player_character")
     if not pc_id:
-        return None
+        return None, None
     forced = _env_bool("AI_DM_NEW_CHARACTER", default=False)
     live_sheet = sheet_path(pack, pc_id)
     if not forced and live_sheet.exists():
-        return None
+        return None, None
     if not forced and not needs_wizard(pack, pc_id):
-        return None
+        return None, None
 
     use_local = _env_bool("AI_DM_LOCAL_WIZARD", default=False)
     sheet: dict | None = None
@@ -178,7 +219,7 @@ def _maybe_run_character_wizard(pack: CampaignPack, container: Container) -> str
             sheet = run_wizard(pc_id, pack=pack)
         except (EOFError, KeyboardInterrupt):
             logger.warning("character wizard cancelled; continuing with existing state")
-            return None
+            return None, None
     else:
         logger.info(
             "no character sheet for %s — prompting via Foundry browser. "
@@ -195,18 +236,18 @@ def _maybe_run_character_wizard(pack: CampaignPack, container: Container) -> str
             sheet = wizard.prompt_and_wait()
         except KeyboardInterrupt:
             logger.warning("character wizard cancelled; continuing with existing state")
-            return None
+            return None, None
         user_id = wizard.player_user_id
 
     if sheet is None:
         logger.warning("character wizard produced no sheet; continuing with existing state")
-        return None
+        return None, None
     try:
         path = write_sheet(pack, pc_id, sheet)
         logger.info("character wizard wrote sheet: %s", path)
     except Exception as exc:  # noqa: BLE001
         logger.warning("character wizard write failed: %s", exc)
-    return user_id
+    return user_id, sheet
 
 
 def _request_user_actor_binding(
@@ -421,8 +462,6 @@ def _apply_hardcoded_start(pack: CampaignPack, container: Container) -> None:
     except Exception as exc:  # noqa: BLE001
         logger.warning("seed_characters failed: %s", exc)
 
-    pc_sheet = _load_character_sheet(pack, pc_id)
-    pc_name = (pc_sheet.get("name") if pc_sheet else None) or pc_id
 
     # 2. Push the start sequence to Foundry: activate scene → create
     #    actor (idempotent if already registered) → spawn token.
@@ -485,90 +524,12 @@ def _apply_hardcoded_start(pack: CampaignPack, container: Container) -> None:
         ActivateSceneCommand(scene_id=scene_id),
     ]
 
-    # Skip create_actor if the registry already knows this PC; otherwise
-    # attempt to create one. The BatchExecutor will register the result.
-    #
-    # When we create/discover the actor by display name, token spawning must
-    # use that same resolvable reference on the first startup pass. Some packs
-    # (including non-Morgana ones) use a stable character-sheet id that does
-    # not match the Foundry actor name.
-    spawn_actor_ref = pc_id
-    if container.registry.get("actor", pc_id) is None:
-        payload = dnd5e_actor_payload(pc_sheet)
-        commands.append(
-            CreateActorCommand(
-                name=pc_name,
-                actor_type="character",
-                system=payload["system"],
-                items=payload["items"],
-            )
-        )
-        spawn_actor_ref = pc_name
-    else:
-        # Actor already exists in Foundry — push a sync update so any sheet
-        # changes (HP, stats, level) are reflected without re-creating it.
-        patch = _dnd5e_patch_from_sheet(pc_sheet)
-        if patch:
-            commands.append(UpdateActorCommand(actor_id=pc_id, patch=patch))
-
-    # Pick a meaningful spawn location for the party rather than (0, 0).
-    # Priority: manifest's ``start.spawn_anchor`` → first authored anchor
-    # tagged "entrance"/"start" → first authored anchor → scene centre.
-    spawn_x, spawn_y = _spawn_position(container, pack, scene_id)
-
-    # Spawn at the chosen anchor.
-    commands.append(
-        SpawnTokenCommand(
-            scene_id=scene_id,
-            actor_id=spawn_actor_ref,
-            x=spawn_x,
-            y=spawn_y,
-            name=pc_name,
-        )
+    # Active PC + AI companions: create-or-update actors and spawn
+    # tokens at the chosen anchor. Shared with the travel pipeline so
+    # behaviour stays in lock-step.
+    commands.extend(
+        build_party_spawn_commands(container, pack, scene_id, pc_id=pc_id)
     )
-
-    # Spawn the rest of the party (AI-controlled companions) at small
-    # offsets around the PC. Idempotency on Foundry's side is the JS
-    # bridge's responsibility; we issue the commands unconditionally so
-    # restarts after a wipe re-place missing tokens.
-    party = _party_members(pack)
-    offset_step = 100  # pixel offset between adjacent party tokens
-    other_idx = 0
-    for member in party:
-        cid = member["id"]
-        if cid == pc_id:
-            continue
-        sheet = _load_character_sheet(pack, cid)
-        member_name = (sheet.get("name") if sheet else None) or member.get("name") or cid
-        if container.registry.get("actor", cid) is None:
-            member_payload = dnd5e_actor_payload(sheet)
-            commands.append(
-                CreateActorCommand(
-                    name=member_name,
-                    actor_type="character",
-                    system=member_payload["system"],
-                    items=member_payload["items"],
-                )
-            )
-            actor_ref: str = member_name
-        else:
-            actor_ref = cid
-            patch = _dnd5e_patch_from_sheet(sheet)
-            if patch:
-                commands.append(UpdateActorCommand(actor_id=cid, patch=patch))
-        other_idx += 1
-        # Fan out: alternate left/right of the PC's spawn point.
-        sign = -1 if other_idx % 2 == 0 else 1
-        offset = sign * offset_step * ((other_idx + 1) // 2)
-        commands.append(
-            SpawnTokenCommand(
-                scene_id=scene_id,
-                actor_id=actor_ref,
-                x=max(0, spawn_x + offset),
-                y=spawn_y,
-                name=member_name,
-            )
-        )
 
     # Project the campaign-pack anchors for this scene as Foundry note
     # pins. Without this, ``move_actor_to "valley overlook"`` (or any
@@ -811,52 +772,9 @@ def _maybe_reset_foundry_state(pack: CampaignPack, container: Container) -> None
 
 
 def _anchor_pin_commands(container, scene_id: str) -> list[CreateNoteCommand]:
-    """Build idempotent ``create_note`` commands for every anchor on
-    the start scene so map-based moves like ``move to brink`` resolve.
-
-    Reads from :class:`LocationService` so it picks up whatever the
-    campaign pack put in ``locations/*/scene_locations.json``. Returns
-    an empty list when the service has no entry for ``scene_id``
-    (legacy packs / no anchors authored).
-
-    The JS-side ``createNote`` is idempotent on label match, so this
-    safely runs every startup without spawning duplicate pins.
-    """
-    out: list[CreateNoteCommand] = []
+    """Backwards-compatible shim around :func:`scene_setup.build_anchor_pin_commands`."""
     loc = getattr(container, "location_service", None)
-    if loc is None or not scene_id:
-        return out
-    scene = loc.get_scene(scene_id)
-    if scene is None:
-        return out
-    seen: set[str] = set()
-    for anchor in (scene.anchors or []):
-        name = (anchor.name or "").strip()
-        if not name:
-            continue
-        key = name.lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        try:
-            out.append(
-                CreateNoteCommand(
-                    scene_id=scene_id,
-                    x=int(anchor.x),
-                    y=int(anchor.y),
-                    text=name,
-                )
-            )
-        except Exception as exc:  # noqa: BLE001
-            logger.warning(
-                "anchor pin skipped (%s): %s", name, exc,
-            )
-    if out:
-        logger.info(
-            "projecting %d anchor pin(s) onto scene %s: %s",
-            len(out), scene_id, [c.text for c in out],
-        )
-    return out
+    return _scene_anchor_pin_commands(loc, scene_id)
 
 
 
@@ -872,51 +790,14 @@ _GRID_SIZE = 100
 
 
 def _scene_bounds(container, scene_id: str) -> tuple[int, int] | None:
-    """Compute (width, height) that just encompasses every anchor + zone
-    in the pack's scene_locations.json for ``scene_id``, with padding.
-
-    Returns ``None`` if the scene has no anchors and no zones (caller
-    should fall back to defaults).
-    """
-    loc = getattr(container, "location_service", None)
-    if loc is None or not scene_id:
-        return None
-    scene = loc.get_scene(scene_id)
-    if scene is None:
-        return None
-    xs: list[int] = []
-    ys: list[int] = []
-    for a in (scene.anchors or []):
-        xs.append(int(a.x)); ys.append(int(a.y))
-    for z in (scene.zones or []):
-        if z.shape == "rect" and z.rect:
-            x0, y0, x1, y1 = z.rect
-            xs.extend([int(x0), int(x1)])
-            ys.extend([int(y0), int(y1)])
-        elif z.polygon:
-            for px, py in z.polygon:
-                xs.append(int(px)); ys.append(int(py))
-    if not xs or not ys:
-        return None
-    width = max(_MIN_SCENE_DIM, max(xs) + _SCENE_PAD)
-    height = max(_MIN_SCENE_DIM, max(ys) + _SCENE_PAD)
-    # Round up to whole grid squares so the scene aligns cleanly.
-    width = ((width + _GRID_SIZE - 1) // _GRID_SIZE) * _GRID_SIZE
-    height = ((height + _GRID_SIZE - 1) // _GRID_SIZE) * _GRID_SIZE
-    return (width, height)
+    """Backwards-compatible shim. See :mod:`ai_dm.app.scene_setup`."""
+    from ai_dm.app.scene_setup import _scene_bounds as _impl
+    return _impl(getattr(container, "location_service", None), scene_id)
 
 
 def _build_create_scene(container, scene_id: str) -> CreateSceneCommand:
-    """Construct a CreateSceneCommand sized to fit the pack's anchors."""
-    bounds = _scene_bounds(container, scene_id)
-    if bounds is None:
-        return CreateSceneCommand(name=scene_id)  # defaults
-    w, h = bounds
-    logger.info(
-        "scene %s sized to %dx%d (grid=%d) from pack anchors/zones",
-        scene_id, w, h, _GRID_SIZE,
-    )
-    return CreateSceneCommand(name=scene_id, width=w, height=h, grid=_GRID_SIZE)
+    """Backwards-compatible shim around :func:`scene_setup.build_create_scene`."""
+    return _scene_build_create_scene(getattr(container, "location_service", None), scene_id)
 
 
 def _spawn_position(container, pack: CampaignPack, scene_id: str) -> tuple[int, int]:
@@ -959,8 +840,151 @@ def _spawn_position(container, pack: CampaignPack, scene_id: str) -> tuple[int, 
 
 
 # --------------------------------------------------------------------- #
-# Party briefs (for the narrator's prompt context)
+# Party spawn helper (shared by startup + travel)
 # --------------------------------------------------------------------- #
+
+
+def _registry_actor_known(registry, alias_or_id: str):
+    """Return the registry entry for ``alias_or_id`` or None.
+
+    Unlike ``registry.get("actor", x)`` (which only matches the Foundry
+    document id), this walks the alias index so canonical pack ids like
+    ``pc_human`` count as "known" once they've been registered as an
+    alias on a previous startup. Without this, the bootstrap helper
+    re-issued ``create_actor`` on every party move, which both spammed
+    Foundry and prevented the canonical id from ever ending up in the
+    registry.
+    """
+    if registry is None or not alias_or_id:
+        return None
+    try:
+        foundry_id = registry.resolve("actor", alias_or_id)
+    except Exception:  # noqa: BLE001 — RegistryMissError + defensive
+        return None
+    return registry.get("actor", foundry_id)
+
+
+def build_party_spawn_commands(
+    container,
+    pack: CampaignPack,
+    scene_id: str,
+    *,
+    pc_id: str | None = None,
+) -> list[GameCommand]:
+    """Build the create-actor / update-actor / spawn-token commands
+    needed to place the active PC plus every AI companion onto
+    ``scene_id``.
+
+    The Foundry-side ``spawnToken`` is idempotent per (scene, actor),
+    so re-issuing these on every travel reuses the existing token
+    instead of duplicating it. ``create_actor`` is skipped when the
+    registry already knows the PC; ``update_actor`` is issued instead
+    so HP/level changes propagate.
+
+    Used by:
+      * ``_apply_hardcoded_start`` — initial scene at startup.
+      * ``IntentRouter._dispatch_travel`` — every cross-scene travel,
+        so the player keeps a controlled token (and vision) on the
+        new scene instead of arriving as a disembodied camera.
+    """
+    if pack is None or not scene_id:
+        return []
+
+    commands: list[GameCommand] = []
+    pc_id = pc_id or _resolve_active_pc_id(pack)
+
+    spawn_x, spawn_y = _spawn_position(container, pack, scene_id)
+
+    # Active PC -------------------------------------------------------- #
+    pc_sheet = _load_character_sheet(pack, pc_id) if pc_id else None
+    pc_name = (pc_sheet.get("name") if pc_sheet else None) or (pc_id or "PC")
+    spawn_actor_ref: str = pc_id or pc_name
+    if pc_id and _registry_actor_known(container.registry, pc_id) is None:
+        payload = dnd5e_actor_payload(pc_sheet)
+        commands.append(
+            CreateActorCommand(
+                name=pc_name,
+                actor_type="character",
+                system=payload["system"],
+                items=payload["items"],
+                # Register the canonical pack id as an alias so a later
+                # ``move_actor_to(actor_id="pc_human")`` resolves via the
+                # validator instead of being passed through to JS where
+                # ``resolveActor("pc_human")`` would return null and the
+                # move would fail with "no token for actor pc_human".
+                aliases=[pc_id],
+            )
+        )
+        spawn_actor_ref = pc_name
+    elif pc_id:
+        patch = _dnd5e_patch_from_sheet(pc_sheet)
+        if patch:
+            commands.append(UpdateActorCommand(actor_id=pc_id, patch=patch))
+
+    if pc_id:
+        commands.append(
+            SpawnTokenCommand(
+                scene_id=scene_id,
+                actor_id=spawn_actor_ref,
+                x=spawn_x,
+                y=spawn_y,
+                name=pc_name,
+            )
+        )
+
+    # Companions ------------------------------------------------------- #
+    party = _party_members(pack)
+    offset_step = 100
+    other_idx = 0
+    for member in party:
+        cid = member.get("id")
+        if not cid or cid == pc_id:
+            continue
+        sheet = _load_character_sheet(pack, cid)
+        member_name = (sheet.get("name") if sheet else None) or member.get("name") or cid
+        if _registry_actor_known(container.registry, cid) is None:
+            member_payload = dnd5e_actor_payload(sheet)
+            commands.append(
+                CreateActorCommand(
+                    name=member_name,
+                    actor_type="character",
+                    system=member_payload["system"],
+                    items=member_payload["items"],
+                    # See PC branch above — ensures the canonical pack id
+                    # ("companion_witch", etc.) becomes a registry alias
+                    # so party-scope moves can resolve each NPC.
+                    aliases=[cid],
+                )
+            )
+            actor_ref: str = member_name
+        else:
+            actor_ref = cid
+            patch = _dnd5e_patch_from_sheet(sheet)
+            if patch:
+                commands.append(UpdateActorCommand(actor_id=cid, patch=patch))
+        other_idx += 1
+        sign = -1 if other_idx % 2 == 0 else 1
+        offset = sign * offset_step * ((other_idx + 1) // 2)
+        commands.append(
+            SpawnTokenCommand(
+                scene_id=scene_id,
+                actor_id=actor_ref,
+                x=max(0, spawn_x + offset),
+                y=spawn_y,
+                name=member_name,
+            )
+        )
+
+    return commands
+
+
+def _resolve_active_pc_id(pack: CampaignPack) -> str | None:
+    """Best-effort active-PC id: manifest's ``start.pc`` then first party member."""
+    pc_id = (pack.manifest.start or {}).get("pc")
+    if pc_id:
+        return pc_id
+    members = _party_members(pack)
+    return members[0]["id"] if members else None
 
 
 def _build_party_brief(pack: CampaignPack, *, exclude_id: str | None) -> list[dict]:

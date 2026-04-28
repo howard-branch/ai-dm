@@ -344,11 +344,12 @@ class BatchExecutor:
                 aliases=(cmd.name,),
             )
         elif isinstance(cmd, CreateActorCommand) and result.get("actorId"):
+            extra_aliases = tuple(a for a in (cmd.aliases or []) if a)
             self.registry.register(
                 "actor",
                 result["actorId"],
                 name=result.get("actorName") or cmd.name,
-                aliases=(cmd.name,),
+                aliases=(cmd.name, *extra_aliases),
             )
         elif isinstance(cmd, SpawnTokenCommand) and result.get("tokenId"):
             self.registry.register(

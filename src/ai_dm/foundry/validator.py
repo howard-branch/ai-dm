@@ -43,8 +43,11 @@ from ai_dm.models.commands import (
 DEFAULT_ACTOR_PATCH_ALLOW: tuple[str, ...] = (
     "name",
     "img",
+    "system.abilities.",
     "system.attributes.",
     "system.details.",
+    "system.skills.",
+    "system.spells.",
     "system.traits.",
 )
 

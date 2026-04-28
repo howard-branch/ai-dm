@@ -72,6 +72,27 @@ def find_scene_node(pack: CampaignPack, scene_id: str) -> dict | None:
     return None
 
 
+def find_chapter_scene(pack: CampaignPack, scene_id: str) -> dict | None:
+    """Return the chapter-scene entry whose ``id`` matches ``scene_id``.
+
+    Chapter scenes (``chapters/<chap>/scenes.json``) carry narrative
+    metadata — name, summary, ``location_id`` pointing at the
+    ``locations/<loc>/`` folder, and per-scene anchors. They aren't
+    indexed in ``locations/*/nodes.json`` (those are physical map
+    nodes), so when the planner tracks a chapter scene as the current
+    scene, ``find_scene_node`` correctly returns ``None`` — but the
+    LLM still needs *something* to anchor "where am I" to. This
+    helper exposes that mapping.
+    """
+    if not scene_id:
+        return None
+    for blob in _iter_json_files(pack.paths.chapters, "scenes.json"):
+        for sc in blob.get("scenes") or []:
+            if sc.get("id") == scene_id:
+                return sc
+    return None
+
+
 def find_scene_anchors(pack: CampaignPack, scene_id: str) -> list[dict]:
     """Return the anchors block for ``scene_id`` from ``scene_locations.json``."""
     out: list[dict] = []
@@ -176,12 +197,27 @@ def _collect_interactables(
     npcs: list[dict],
 ) -> list[dict]:
     """Merge node features + interesting anchors + scene NPCs into a
-    flat ``[{name, kind, hint}]`` list, deduped by lowercase name.
+    flat ``[{name, kind, hint?, description?, interactions?}]`` list,
+    deduped by lowercase name.
+
+    Authored fields (``description``, ``interactions``, ``hint``) are
+    forwarded verbatim so they reach the LLM via ``scene_brief``. The
+    narrator prompt instructs the model to read those fields when the
+    player engages with an interactable, which is how we expose
+    affordances like "search for the silver tithe bowl, DC 12
+    Perception" without hard-coding mechanics into the engine.
     """
     out: list[dict] = []
     seen: set[str] = set()
 
-    def _push(name: str, kind: str, hint: str | None = None) -> None:
+    def _push(
+        name: str,
+        kind: str,
+        *,
+        hint: str | None = None,
+        description: str | None = None,
+        interactions: list | None = None,
+    ) -> None:
         clean = _humanise(name)
         key = clean.lower()
         if not clean or key in seen:
@@ -190,6 +226,18 @@ def _collect_interactables(
         entry: dict[str, Any] = {"name": clean, "kind": kind}
         if hint:
             entry["hint"] = hint
+        if description:
+            entry["description"] = description.strip()
+        if interactions:
+            # Keep only well-shaped action dicts (verb + at least one
+            # other field) so a stray scalar in an authored file
+            # doesn't poison the LLM context.
+            cleaned = [
+                ix for ix in interactions
+                if isinstance(ix, dict) and ix.get("verb")
+            ]
+            if cleaned:
+                entry["interactions"] = cleaned
         out.append(entry)
 
     # Named features on the node (these are explicitly authored as
@@ -199,12 +247,22 @@ def _collect_interactables(
             continue
         if feat.get("interactable") is False:
             continue
-        _push(feat.get("name") or feat.get("id"), "object")
+        _push(
+            feat.get("name") or feat.get("id"),
+            "object",
+            description=feat.get("description"),
+            interactions=feat.get("interactions"),
+        )
 
     # NPCs in this scene.
     for npc in npcs:
-        _push(npc.get("name") or npc.get("id"), "npc",
-              hint=npc.get("disposition") or None)
+        _push(
+            npc.get("name") or npc.get("id"),
+            "npc",
+            hint=npc.get("disposition") or None,
+            description=npc.get("description"),
+            interactions=npc.get("interactions"),
+        )
 
     # Anchors with meaningful tags. Skip pure travel/zone markers.
     for a in anchors:
@@ -213,7 +271,12 @@ def _collect_interactables(
             continue
         if not (set(tags) & _INTERESTING_ANCHOR_TAGS):
             continue
-        _push(a.get("name") or a.get("id"), _anchor_kind(tags))
+        _push(
+            a.get("name") or a.get("id"),
+            _anchor_kind(tags),
+            description=a.get("description"),
+            interactions=a.get("interactions"),
+        )
 
     return out
 
@@ -384,6 +447,17 @@ def build_scene_brief(
     candidates: list[str] = []
     if scene_id:
         candidates.append(scene_id)
+    # If ``scene_id`` is a chapter scene id (chapters/<chap>/scenes.json),
+    # also probe its ``location_id`` so the brief can find the
+    # underlying physical node. Without this the lookup falls all the
+    # way back to the manifest's start scene and the LLM keeps
+    # describing the *first* location after the player has travelled
+    # several scenes deep.
+    chapter_scene = find_chapter_scene(pack, scene_id) if scene_id else None
+    if chapter_scene:
+        loc_id = chapter_scene.get("location_id")
+        if loc_id and loc_id not in candidates:
+            candidates.append(loc_id)
     start_scene = (pack.manifest.start or {}).get("scene")
     if start_scene and start_scene not in candidates:
         candidates.append(start_scene)
@@ -409,12 +483,19 @@ def build_scene_brief(
             chosen = cand
             break
 
-    if node is None and not anchors and not npcs:
+    if node is None and not anchors and not npcs and chapter_scene is None:
         return None
 
     interactables = _collect_interactables(node, anchors, npcs)
     exits = _collect_exits(node)
-    scene_name = (node or {}).get("name") or _humanise(chosen or "").title()
+    # Prefer the chapter-scene name when we matched via chapter scenes —
+    # the player asked "where am I" expecting the *narrative* scene
+    # name ("The Haunted House"), not the parent location's id.
+    scene_name = (
+        (chapter_scene or {}).get("name")
+        or (node or {}).get("name")
+        or _humanise(chosen or scene_id or "").title()
+    )
 
     # Compact spoken summary the LLM can quote verbatim or paraphrase.
     things = [_a_or_an(i["name"]) for i in interactables
@@ -423,16 +504,45 @@ def build_scene_brief(
                  if i.get("kind") == "npc" and i.get("name")]
     ex_names = [e["name"] for e in exits if e.get("name")]
     parts: list[str] = []
+    # Lead the summary with the chapter scene's authored one-liner so
+    # the LLM has narrative grounding for the *current* scene even
+    # when no anchors/npcs/exits are authored at the location-node
+    # level. Keeps "where am I" honest after travel.
+    if chapter_scene and chapter_scene.get("summary"):
+        parts.append(str(chapter_scene["summary"]).strip())
     if things:
         parts.append("Around you: " + _human_join(things) + ".")
     if npc_names:
         parts.append("NPCs here: " + _human_join(npc_names) + ".")
     if ex_names:
         parts.append("Exits: " + _human_join(ex_names) + ".")
+    # Per-interactable affordance lines so the LLM can answer
+    # "what can I do at the altar?" without re-deriving it from
+    # mood prose. The structured ``interactions`` list is also
+    # passed in scene_brief for richer reasoning.
+    for entry in interactables:
+        actions = entry.get("interactions") or []
+        if not actions:
+            continue
+        verbs = []
+        for ix in actions:
+            v = ix.get("verb")
+            if not v:
+                continue
+            label = ix.get("summary") or ix.get("narration") or _humanise(v)
+            check = ix.get("check")
+            dc = ix.get("dc")
+            if check and dc is not None:
+                label = f"{label} ({check.upper()} DC {dc})"
+            elif check:
+                label = f"{label} ({check.upper()})"
+            verbs.append(label)
+        if verbs:
+            parts.append(f"At the {entry['name']} you can: " + "; ".join(verbs) + ".")
     summary = " ".join(parts)
 
     return {
-        "scene_id": chosen,
+        "scene_id": chosen or scene_id,
         "scene_name": scene_name,
         "interactables": interactables,
         "exits": exits,

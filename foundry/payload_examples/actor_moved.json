@@ -1,0 +1,11 @@
+{
+  "type": "actor_moved",
+  "encounter_id": "enc_001",
+  "actor_id": "pc_alice",
+  "from": [120, 80],
+  "to": [200, 80],
+  "distance_ft": 30,
+  "remaining_ft": 0,
+  "difficult": false
+}
+

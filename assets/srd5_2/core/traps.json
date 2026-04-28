@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "notes": "SRD-style trap catalog. detect_dc / disarm_dc are Perception / Thieves' Tools DCs. Either `attack` or `save` resolves the primary effect.",
+  "severities": ["setback", "dangerous", "deadly"],
+  "triggers": ["pressure_plate", "tripwire", "proximity", "opened"],
+  "resets": ["manual", "auto", "never"],
+  "traps": [
+    {
+      "key": "dart_trap",
+      "name": "Poisoned Dart Trap",
+      "detect_dc": 15,
+      "disarm_dc": 15,
+      "trigger": "pressure_plate",
+      "attack": {"bonus": 8, "damage": "1d4", "damage_type": "piercing"},
+      "secondary": {"save": {"ability": "con", "dc": 11, "on_success_half": false}, "damage": "2d10", "damage_type": "poison"},
+      "single_use": false,
+      "reset": "manual",
+      "severity": "dangerous",
+      "description": "Darts shoot from concealed holes when the plate is stepped on."
+    },
+    {
+      "key": "pit_simple",
+      "name": "Simple Pit Trap",
+      "detect_dc": 10,
+      "disarm_dc": 10,
+      "trigger": "pressure_plate",
+      "save": {"ability": "dex", "dc": 12, "on_success_half": false},
+      "primary": {"damage_per_10ft": "1d6", "damage_type": "bludgeoning", "depth_ft": 20},
+      "single_use": true,
+      "reset": "never",
+      "severity": "setback",
+      "description": "A covered pit drops the victim into the hole."
+    },
+    {
+      "key": "pit_spiked",
+      "name": "Spiked Pit Trap",
+      "detect_dc": 15,
+      "disarm_dc": 15,
+      "trigger": "pressure_plate",
+      "save": {"ability": "dex", "dc": 14, "on_success_half": false},
+      "primary": {"damage_per_10ft": "1d6", "extra_damage": "3d6", "damage_type": "piercing", "depth_ft": 20},
+      "single_use": true,
+      "reset": "never",
+      "severity": "dangerous"
+    },
+    {
+      "key": "poison_needle",
+      "name": "Poison Needle",
+      "detect_dc": 20,
+      "disarm_dc": 15,
+      "trigger": "opened",
+      "attack": {"bonus": 8, "damage": "1", "damage_type": "piercing"},
+      "secondary": {"save": {"ability": "con", "dc": 15, "on_success_half": true}, "damage": "11d6", "damage_type": "poison"},
+      "single_use": true,
+      "reset": "manual",
+      "severity": "dangerous"
+    },
+    {
+      "key": "falling_net",
+      "name": "Falling Net",
+      "detect_dc": 10,
+      "disarm_dc": 15,
+      "trigger": "tripwire",
+      "save": {"ability": "dex", "dc": 10, "on_success_half": false},
+      "condition_on_fail": "restrained",
+      "single_use": true,
+      "reset": "manual",
+      "severity": "setback"
+    },
+    {
+      "key": "fireball_glyph",
+      "name": "Fireball Glyph of Warding",
+      "detect_dc": 17,
+      "disarm_dc": 17,
+      "trigger": "proximity",
+      "save": {"ability": "dex", "dc": 15, "on_success_half": true},
+      "primary": {"damage": "8d6", "damage_type": "fire", "aoe_radius_ft": 20},
+      "single_use": true,
+      "reset": "never",
+      "severity": "deadly"
+    }
+  ]
+}
+

@@ -1,0 +1,8 @@
+{
+  "type": "concentration_save",
+  "actor_id": "pc_alice",
+  "damage": 18,
+  "dc": 10,
+  "save_modifier": 4
+}
+

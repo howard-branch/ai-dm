@@ -42,7 +42,7 @@ def test_defaults_cover_every_required_field() -> None:
     assert c.spell_slots == {}
     assert c.cantrips == c.known_spells == c.prepared_spells == []
     # Versioning stamped.
-    assert c.schema_version == 2
+    assert c.schema_version == 6
 
 
 def test_participant_alias_is_combatant_state() -> None:
@@ -56,6 +56,68 @@ def test_participant_alias_is_combatant_state() -> None:
 def test_extra_fields_rejected() -> None:
     with pytest.raises(Exception):
         CombatantState(actor_id="a", name="A", junk_field=1)
+
+
+def test_caster_fields_default_to_none_for_non_casters() -> None:
+    c = CombatantState(actor_id="a", name="A")
+    assert c.spellcasting_ability is None
+    assert c.spell_attack_bonus is None
+    assert c.spell_save_dc is None
+    assert c.casting_style is None
+    assert c.prepared_cap is None
+    assert c.ritual_caster is False
+    assert c.rituals == []
+
+
+def test_is_prepared_respects_casting_style() -> None:
+    known_caster = CombatantState(
+        actor_id="s", name="S",
+        casting_style="known",
+        cantrips=["fire_bolt"],
+        known_spells=["magic_missile"],
+        prepared_spells=[],
+    )
+    assert known_caster.is_prepared("fire_bolt") is True
+    assert known_caster.is_prepared("magic_missile") is True
+    assert known_caster.is_prepared("shield") is False
+
+    prepared_caster = CombatantState(
+        actor_id="w", name="W",
+        casting_style="prepared",
+        cantrips=["light"],
+        known_spells=["shield", "magic_missile", "sleep"],
+        prepared_spells=["shield"],
+    )
+    assert prepared_caster.is_prepared("light") is True
+    assert prepared_caster.is_prepared("shield") is True
+    assert prepared_caster.is_prepared("magic_missile") is False
+
+
+def test_lowest_available_slot_for_upcasting() -> None:
+    c = CombatantState(
+        actor_id="w", name="W",
+        spell_slots={
+            1: SpellSlot(level=1, current=0, max=4),
+            2: SpellSlot(level=2, current=2, max=2),
+            3: SpellSlot(level=3, current=1, max=2),
+        },
+    )
+    # Min level 1 → first non-empty pool is level-2.
+    assert c.lowest_available_slot(1) == 2
+    assert c.lowest_available_slot(3) == 3
+    # Cantrip — disallowed (no slots consumed).
+    assert c.lowest_available_slot(0) is None
+    c.spell_slots[2].current = 0
+    c.spell_slots[3].current = 0
+    assert c.lowest_available_slot(1) is None
+
+
+def test_can_ritual_cast_requires_flag_and_membership() -> None:
+    c = CombatantState(actor_id="w", name="W", rituals=["detect_magic"])
+    assert c.can_ritual_cast("detect_magic") is False  # ritual_caster=False
+    c.ritual_caster = True
+    assert c.can_ritual_cast("detect_magic") is True
+    assert c.can_ritual_cast("fireball") is False
 
 
 # --------------------------------------------------------------------- #
@@ -211,7 +273,7 @@ def test_from_pc_sheet_handles_legacy_then_migrated_sheet() -> None:
     assert (c.hp, c.max_hp, c.temp_hp) == (7, 9, 2)
     assert c.ac == 13
     assert c.speed == 25
-    assert c.conditions == ["prone"]
+    assert c.condition_keys() == {"prone"}
     assert c.cantrips == ["light"]
     # Scholar is "prepared" — migration moved the v1 list into spellbook
     # and kept it as the prepared subset; from_pc_sheet pulls ids.
@@ -345,7 +407,7 @@ def test_snapshot_round_trip_preserves_canonical_state() -> None:
     assert p.prepared_spells == ["shield"]
     assert p.resources["sw"].max == 1
     assert p.concentration and p.concentration.spell_id == "bless"
-    assert p.schema_version == 2
+    assert p.schema_version == 6
 
 
 def test_combat_state_typing_accepts_dict_inputs_via_validation() -> None:

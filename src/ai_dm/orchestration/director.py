@@ -109,7 +109,7 @@ class Director:
     # Intent dispatch
     # ------------------------------------------------------------------ #
 
-    _MECHANICAL_INTENT_TYPES = ("move", "interact", "attack", "skill_check")
+    _MECHANICAL_INTENT_TYPES = ("move", "travel", "interact", "attack", "skill_check")
 
     def _maybe_dispatch_intent(
         self,

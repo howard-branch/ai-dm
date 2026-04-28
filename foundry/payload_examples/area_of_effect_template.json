@@ -1,0 +1,8 @@
+{
+  "type": "area_of_effect_template",
+  "shape": "cone",
+  "anchor": {"x": 320, "y": 240, "scene_id": "scene_001"},
+  "size_ft": 15,
+  "direction_deg": 90
+}
+

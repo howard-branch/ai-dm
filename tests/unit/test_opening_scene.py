@@ -180,3 +180,125 @@ def test_build_scene_brief_returns_none_when_no_match(tmp_path) -> None:
     bare = CampaignPack.load(root, state_root=state_root)
     assert build_scene_brief(bare, "nowhere") is None
 
+
+# --------------------------------------------------------------------- #
+# Authored description + interactions surface in scene_brief
+# --------------------------------------------------------------------- #
+
+
+def test_authored_interactions_flow_into_scene_brief(tmp_path: Path) -> None:
+    """Features and NPCs may carry ``description`` + ``interactions``;
+    both must round-trip into ``scene_brief.interactables`` and the
+    summary must surface a per-interactable affordance line so the
+    LLM can answer "what can I do at the altar?" without inventing
+    mechanics."""
+    from ai_dm.app.opening_scene import build_scene_brief
+    from ai_dm.campaign.pack import CampaignPack
+
+    root = tmp_path / "pack"
+    state_root = tmp_path / "state"
+    (root / "prompts").mkdir(parents=True)
+    (root / "campaign.yaml").write_text(
+        "id: rich\nname: Rich\nstart:\n  scene: chapel\n  player_character: pc\n",
+        encoding="utf-8",
+    )
+    locs = root / "locations" / "stensia"
+    _write(locs / "nodes.json", {
+        "nodes": [
+            {
+                "id": "chapel",
+                "name": "Ruined Chapel",
+                "description": "A roofless chapel.",
+                "features": [
+                    {
+                        "id": "object.altar",
+                        "name": "Ruined Altar",
+                        "interactable": True,
+                        "tags": ["holy", "quest"],
+                        "description": "A toppled altar at the nave's far end.",
+                        "interactions": [
+                            {
+                                "verb": "search",
+                                "summary": "Search the rubble beside the altar.",
+                                "check": "wis.perception",
+                                "dc": 12,
+                                "on_success": "A silver tithe bowl: 17 cp, 14 sp, 2 gp.",
+                                "grants": ["loot.silver_tithe_bowl"],
+                            },
+                            {
+                                "verb": "pray",
+                                "summary": "Help finish the unending rite.",
+                                "check": "int.religion",
+                                "dc": 12,
+                                "ends_encounter": "encounter.ancient_devotees",
+                            },
+                            {"summary": "ignored — no verb"},  # malformed
+                        ],
+                    },
+                ],
+            }
+        ]
+    })
+    pack = CampaignPack.load(root, state_root=state_root)
+
+    brief = build_scene_brief(pack, "chapel")
+    assert brief is not None
+
+    altar = next(i for i in brief["interactables"] if i["name"] == "Ruined Altar")
+    assert altar["description"] == "A toppled altar at the nave's far end."
+    assert len(altar["interactions"]) == 2  # malformed entry dropped
+    verbs = {ix["verb"] for ix in altar["interactions"]}
+    assert verbs == {"search", "pray"}
+
+    summary = brief["summary"]
+    assert "At the Ruined Altar you can:" in summary
+    assert "Search the rubble" in summary
+    assert "WIS.PERCEPTION DC 12" in summary
+    assert "INT.RELIGION DC 12" in summary
+
+
+def test_npc_authored_interactions_surface(tmp_path: Path) -> None:
+    """NPCs may also carry ``interactions`` (e.g. dialogue gating
+    checks). They must reach the brief identically to feature/anchor
+    interactions so the LLM can lean on them in conversation scenes."""
+    from ai_dm.app.opening_scene import build_scene_brief
+    from ai_dm.campaign.pack import CampaignPack
+
+    root = tmp_path / "pack"
+    state_root = tmp_path / "state"
+    (root / "prompts").mkdir(parents=True)
+    (root / "campaign.yaml").write_text(
+        "id: rich2\nname: Rich2\nstart:\n  scene: gate\n  player_character: pc\n",
+        encoding="utf-8",
+    )
+    locs = root / "locations" / "shadowgrange"
+    _write(locs / "nodes.json", {
+        "nodes": [{"id": "gate", "name": "Gate"}],
+    })
+    _write(locs / "npcs.json", {
+        "npcs": [
+            {
+                "id": "npc.lars",
+                "name": "Lars",
+                "scene_id": "gate",
+                "disposition": "friendly",
+                "description": "A cathar guard cheerful with strangers.",
+                "interactions": [
+                    {
+                        "verb": "ask_for_directions",
+                        "summary": "Ask Lars where to find someone in the village.",
+                    },
+                ],
+            }
+        ]
+    })
+    pack = CampaignPack.load(root, state_root=state_root)
+    brief = build_scene_brief(pack, "gate")
+    assert brief is not None
+    lars = next(i for i in brief["interactables"] if i["name"] == "Lars")
+    assert lars["description"].startswith("A cathar guard")
+    assert lars["interactions"][0]["verb"] == "ask_for_directions"
+    assert "At the Lars you can: Ask Lars where" in brief["summary"] \
+        or "At the Lars you can: ask_for_directions" in brief["summary"]
+
+

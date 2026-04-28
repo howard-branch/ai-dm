@@ -1,0 +1,8 @@
+{
+  "type": "give_item",
+  "actor_id": "pc_morgana",
+  "item_key": "potion_of_healing",
+  "qty": 2,
+  "container": null
+}
+

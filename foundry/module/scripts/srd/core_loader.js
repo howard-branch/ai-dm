@@ -15,6 +15,12 @@ const BASE = `/modules/${MODULE_ID}/assets/srd5_2/core`;
 const FILES = [
     "abilities", "proficiency", "dcs", "damage_types",
     "conditions", "exhaustion", "death_saves",
+    "initiative", "turn_structure", "actions", "movement",
+    "opportunity_attacks", "cover", "stealth", "grapple_shove",
+    "concentration", "areas_of_effect", "rests",
+    "currency", "weapon_properties", "weapon_mastery",
+    "weapons", "armor", "adventuring_gear", "tools",
+    "mounts_vehicles", "encumbrance", "attunement",
 ];
 
 let _cache = null;

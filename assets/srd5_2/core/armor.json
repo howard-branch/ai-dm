@@ -1,0 +1,22 @@
+{
+  "_doc": "SRD 5.2.1 armor + shield. ac.dex governs how Dex modifier folds into AC: 'add' = full Dex; 'add_max_2' = Dex capped at +2; 'none' = ignored; 'flat' (shield) = ac.base is a flat AC bonus. strength_req: minimum STR or speed -10 ft; null = no requirement.",
+  "armors": [
+    {"key": "padded",        "name": "Padded",        "category": "light",  "cost": {"amount": 5,   "unit": "gp"}, "weight": 8,  "ac": {"base": 11, "dex": "add"},        "strength_req": null, "stealth_disadvantage": true,  "don_time": "1 min",  "doff_time": "1 min"},
+    {"key": "leather",       "name": "Leather",       "category": "light",  "cost": {"amount": 10,  "unit": "gp"}, "weight": 10, "ac": {"base": 11, "dex": "add"},        "strength_req": null, "stealth_disadvantage": false, "don_time": "1 min",  "doff_time": "1 min"},
+    {"key": "studded_leather","name": "Studded Leather","category": "light", "cost": {"amount": 45, "unit": "gp"}, "weight": 13, "ac": {"base": 12, "dex": "add"},        "strength_req": null, "stealth_disadvantage": false, "don_time": "1 min",  "doff_time": "1 min"},
+
+    {"key": "hide",          "name": "Hide",          "category": "medium", "cost": {"amount": 10,  "unit": "gp"}, "weight": 12, "ac": {"base": 12, "dex": "add_max_2"},  "strength_req": null, "stealth_disadvantage": false, "don_time": "1 min",  "doff_time": "1 min"},
+    {"key": "chain_shirt",   "name": "Chain Shirt",   "category": "medium", "cost": {"amount": 50,  "unit": "gp"}, "weight": 20, "ac": {"base": 13, "dex": "add_max_2"},  "strength_req": null, "stealth_disadvantage": false, "don_time": "1 min",  "doff_time": "1 min"},
+    {"key": "scale_mail",    "name": "Scale Mail",    "category": "medium", "cost": {"amount": 50,  "unit": "gp"}, "weight": 45, "ac": {"base": 14, "dex": "add_max_2"},  "strength_req": null, "stealth_disadvantage": true,  "don_time": "1 min",  "doff_time": "1 min"},
+    {"key": "breastplate",   "name": "Breastplate",   "category": "medium", "cost": {"amount": 400, "unit": "gp"}, "weight": 20, "ac": {"base": 14, "dex": "add_max_2"},  "strength_req": null, "stealth_disadvantage": false, "don_time": "1 min",  "doff_time": "1 min"},
+    {"key": "half_plate",    "name": "Half Plate",    "category": "medium", "cost": {"amount": 750, "unit": "gp"}, "weight": 40, "ac": {"base": 15, "dex": "add_max_2"},  "strength_req": null, "stealth_disadvantage": true,  "don_time": "5 min",  "doff_time": "1 min"},
+
+    {"key": "ring_mail",     "name": "Ring Mail",     "category": "heavy",  "cost": {"amount": 30,  "unit": "gp"}, "weight": 40, "ac": {"base": 14, "dex": "none"},       "strength_req": null, "stealth_disadvantage": true,  "don_time": "10 min", "doff_time": "5 min"},
+    {"key": "chain_mail",    "name": "Chain Mail",    "category": "heavy",  "cost": {"amount": 75,  "unit": "gp"}, "weight": 55, "ac": {"base": 16, "dex": "none"},       "strength_req": 13,   "stealth_disadvantage": true,  "don_time": "10 min", "doff_time": "5 min"},
+    {"key": "splint",        "name": "Splint",        "category": "heavy",  "cost": {"amount": 200, "unit": "gp"}, "weight": 60, "ac": {"base": 17, "dex": "none"},       "strength_req": 15,   "stealth_disadvantage": true,  "don_time": "10 min", "doff_time": "5 min"},
+    {"key": "plate",         "name": "Plate",         "category": "heavy",  "cost": {"amount": 1500,"unit": "gp"}, "weight": 65, "ac": {"base": 18, "dex": "none"},       "strength_req": 15,   "stealth_disadvantage": true,  "don_time": "10 min", "doff_time": "5 min"},
+
+    {"key": "shield",        "name": "Shield",        "category": "shield", "cost": {"amount": 10,  "unit": "gp"}, "weight": 6,  "ac": {"base": 2,  "dex": "flat"},        "strength_req": null, "stealth_disadvantage": false, "don_time": "1 action", "doff_time": "1 action"}
+  ]
+}
+

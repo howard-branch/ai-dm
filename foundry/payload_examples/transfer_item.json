@@ -1,0 +1,8 @@
+{
+  "type": "transfer_item",
+  "from_actor_id": "pc_morgana",
+  "to_actor_id": "pc_kael",
+  "instance_id": "rope_hempen_50#1",
+  "qty": 1
+}
+

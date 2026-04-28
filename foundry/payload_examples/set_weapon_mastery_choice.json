@@ -1,0 +1,7 @@
+{
+  "type": "set_weapon_mastery_choice",
+  "actor_id": "pc_morgana",
+  "weapon_key": "longsword",
+  "mastery": "sap"
+}
+

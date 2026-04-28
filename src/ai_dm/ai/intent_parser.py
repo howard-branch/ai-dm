@@ -39,13 +39,80 @@ _TRAVEL_RE = re.compile(
     re.IGNORECASE,
 )
 
-# "I move to the altar", "go to the door", "move_actor_to pass_overlook"
+# "I move to the altar", "go to the door", "move_actor_to pass_overlook",
+# "walk into the nave", "step onto the dais", "head through the gate".
 # (the underscore form lets us round-trip the LLM-emitted command type
-# verbatim, and the optional `to` lets the player just say "go altar").
+# verbatim, and the optional `to` lets the player just say "go altar".)
 _MOVE_RE = re.compile(
-    r"\b(?:i\s+)?(?:move(?:_actor)?(?:_to)?|goto|go|walk|run|approach|head)"
-    r"(?:\s+(?:to|toward|towards))?\s+"
+    r"\b(?:i\s+)?(?:move(?:_actor)?(?:_to)?|goto|go|walk|run|approach|head|step|enter)"
+    r"(?:\s+(?:to|toward|towards|into|onto|inside|through|past|across|over\s+to|up\s+to))?\s+"
     r"(?:the\s+|a\s+|an\s+)?(?P<anchor>[\w' \-]+?)\s*[.!?]*$",
+    re.IGNORECASE,
+)
+
+# Cardinal directions (used by both move and partial-move regexes).
+_DIRECTION_TOKENS = (
+    r"north(?:east|west)?|south(?:east|west)?|east|west|"
+    r"ne|nw|se|sw|n|s|e|w|up|down|left|right"
+)
+
+# Partial / directional move:
+#   "move 30 feet toward the altar"
+#   "advance 15 ft north"
+#   "step back 10 feet from the goblin"
+#   "walk 20 feet south"
+# Captures distance (ft) plus an optional direction word and an
+# optional target anchor. ``direction`` is normalised to "toward",
+# "away", or a cardinal token; "back from X" maps to "away".
+_MOVE_DIST_RE = re.compile(
+    r"^\s*(?:i\s+)?"
+    r"(?:move|advance|step|walk|run|head|go|sprint|dash|fall\s+back|back\s+up|"
+    r"retreat|withdraw)"
+    r"(?:\s+back)?"
+    r"\s+(?P<dist>\d{1,3})\s*(?:ft|feet|foot|')"
+    r"(?:"
+    r"\s+(?P<dir_word>toward|towards|to|away\s+from|back\s+from|from)"
+    r"\s+(?:the\s+|a\s+|an\s+)?(?P<anchor>[\w' \-]+?)"
+    r"|"
+    r"\s+(?P<cardinal>" + _DIRECTION_TOKENS + r")"
+    r")?"
+    r"\s*[.!?]*$",
+    re.IGNORECASE,
+)
+
+# Party-scope detection. Players phrase whole-party moves a dozen
+# different ways: "move whole party to the brink", "take everyone to
+# the chapel", "we all head north", "let's go to the door". When any
+# of these phrases is present the intent applies to every party
+# member, not just the active PC. The router fans the move/travel out
+# to one command per party token.
+_PARTY_SCOPE_RE = re.compile(
+    r"\b(?:whole\s+party|the\s+party|party|everyone|everybody|"
+    r"all\s+of\s+us|we\s+all|let'?s|let\s+us|we|us)\b",
+    re.IGNORECASE,
+)
+# Single-pass match for party-scoped move/travel commands. Captures
+# the destination ``anchor``. Accepts an optional outer verb
+# (``move|take|lead|bring|send|march``), the party-scope token, an
+# optional inner verb (``go|head|move|walk|run|...``), an optional
+# preposition (``to|toward|...``) and an optional article. Examples
+# matched (with capture):
+#   "move whole party to the brink"     -> "brink"
+#   "take everyone to the chapel"       -> "chapel"
+#   "lead us to the altar"              -> "altar"
+#   "we head north"                     -> "north"
+#   "let's go to the door"              -> "door"
+#   "we all march to shadowgrange"      -> "shadowgrange"
+_PARTY_MOVE_RE = re.compile(
+    r"^\s*"
+    r"(?:(?:i\s+)?(?:move|take|lead|bring|send|march)\s+)?"
+    r"(?:let'?s\s+|let\s+us\s+)?"
+    r"(?:the\s+)?(?:whole\s+)?"
+    r"(?:party|everyone|everybody|all\s+of\s+us|us|we(?:\s+all)?)\s+"
+    r"(?:(?:go|head|move|walk|run|approach|march|travel|journey|gather|regroup|assemble|step|enter)\s+)?"
+    r"(?:to|toward|towards|into|onto|inside|through|past|across|over\s+to|up\s+to|for|at)?\s*"
+    r"(?:the\s+|a\s+|an\s+)?"
+    r"(?P<anchor>[\w' \-]+?)\s*[.!?]*$",
     re.IGNORECASE,
 )
 
@@ -264,6 +331,62 @@ class IntentParser:
                 target_anchor=dest,
                 raw_text=text,
                 confidence=0.85,
+                extra={"party_scope": True} if _PARTY_SCOPE_RE.search(text) else {},
+            )
+
+        # Party-scope move/travel: "move whole party to the brink",
+        # "take everyone to the chapel", "we head north". Matched
+        # before the single-actor _MOVE_RE so the party-scope phrasing
+        # doesn't accidentally bind to a single PC. The router maps
+        # ``extra.party_scope`` to a fan-out across every party token.
+        m = _PARTY_MOVE_RE.search(text)
+        if m:
+            anchor = _clean(m.group("anchor"))
+            return PlayerIntent(
+                type="move",
+                verb="move",
+                actor_id=self.default_actor_id,
+                target_anchor=anchor,
+                raw_text=text,
+                confidence=0.85,
+                extra={"party_scope": True},
+            )
+
+        # Partial / directional move (matched before the generic
+        # _MOVE_RE so "move 30 feet toward altar" doesn't collapse
+        # into target_anchor="30 feet toward altar").
+        m = _MOVE_DIST_RE.match(text)
+        if m:
+            try:
+                dist = int(m.group("dist"))
+            except (TypeError, ValueError):
+                dist = None
+            anchor_raw = m.group("anchor") if m.groupdict().get("anchor") else None
+            cardinal = (m.group("cardinal") if m.groupdict().get("cardinal") else None) or None
+            dir_word = (m.group("dir_word") if m.groupdict().get("dir_word") else None) or None
+            anchor = _clean(anchor_raw) if anchor_raw else None
+            direction: str | None = None
+            if cardinal:
+                direction = cardinal.lower()
+            elif dir_word:
+                dw = dir_word.lower().strip()
+                if "away" in dw or "back" in dw or dw == "from":
+                    direction = "away"
+                else:
+                    direction = "toward"
+            elif anchor:
+                direction = "toward"
+            return PlayerIntent(
+                type="move",
+                verb="move",
+                actor_id=self.default_actor_id,
+                target_anchor=anchor,
+                distance_ft=dist,
+                direction=direction,
+                raw_text=text,
+                confidence=0.9,
+                extra=({"party_scope": True}
+                       if _PARTY_SCOPE_RE.search(text) else {}),
             )
 
         m = _MOVE_RE.search(text)
@@ -276,6 +399,13 @@ class IntentParser:
                 target_anchor=anchor,
                 raw_text=text,
                 confidence=0.8,
+                # Catch party-scope phrasings that the dedicated
+                # _PARTY_MOVE_RE missed (e.g. "let's go to the door"
+                # — verb "go" is matched by _MOVE_RE first, but the
+                # surrounding "let's" / "us" still implies the whole
+                # party should move).
+                extra=({"party_scope": True}
+                       if _PARTY_SCOPE_RE.search(text) else {}),
             )
 
         m = _CHECK_RE.search(text)

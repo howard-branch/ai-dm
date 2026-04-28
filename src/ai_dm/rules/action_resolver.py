@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from ai_dm.rules.engine import ActorRuleState, RulesEngine
+from ai_dm.rules.spell_resolver import SpellResolver
 from ai_dm.rules.targeting import TargetSpec, resolve_targets
 
 logger = logging.getLogger("ai_dm.rules.resolver")
@@ -66,6 +67,11 @@ class ActionResolver:
         self.rules = rules
         self.actor_lookup = actor_lookup
         self.spell_catalog = spell_catalog or {}
+        self._spell_resolver = SpellResolver(
+            rules=rules,
+            actor_lookup=actor_lookup,
+            spell_catalog=self.spell_catalog,
+        )
 
     def resolve(self, intent: Any, ctx: dict | None = None) -> Any:
         if isinstance(intent, str):
@@ -193,117 +199,35 @@ class ActionResolver:
     # ------------------------------------------------------------------ #
 
     def _resolve_cast_spell(self, intent: Any, ctx: dict) -> ActionResolution:
-        """Resolve a ``cast_spell`` intent.
+        """Resolve a ``cast_spell`` intent by delegating to :class:`SpellResolver`.
 
-        The bookkeeping done here is intentionally narrow: spend the
-        slot, charge the right slice of the action economy, and (if
-        requested) start concentration. Mechanical effects (attack
-        rolls, save DCs) are layered on top by the caller via ``ctx``
-        keys mirroring :meth:`_resolve_attack`.
+        ``SpellResolver`` owns the full pipeline (eligibility, slot,
+        targeting, attack/save, damage, effects, concentration, action
+        economy). Here we just translate its :class:`SpellCastResult`
+        into the :class:`ActionResolution` envelope the rest of the
+        codebase consumes.
         """
-        actor_id = getattr(intent, "actor_id", None) or "player"
-        actor = self._lookup(actor_id)
-        spell = (
-            getattr(intent, "spell", None)
-            or ctx.get("spell")
-            or ctx.get("spell_id")
-        )
-        level = int(ctx.get("level", 0) or 0)
-        casting_time = str(ctx.get("casting_time", "action")).lower()
-        concentrates = bool(ctx.get("concentration", False))
-
-        # ---- targeting resolution ------------------------------------ #
-        # Build a TargetSpec from the catalog when one is wired, else
-        # fall back to a permissive single-target spec inferred from
-        # ctx — this keeps callers that don't care about targeting (and
-        # the legacy combat-action-menu tests) working unchanged.
-        spec_override = ctx.get("target_spec")
-        if isinstance(spec_override, TargetSpec):
-            spec = spec_override
-        elif isinstance(spec_override, dict):
-            spec = TargetSpec.from_catalog({"targeting": spec_override})
-        else:
-            record = self.spell_catalog.get(str(spell)) if spell else None
-            spec = TargetSpec.from_catalog(record) if record else None
-
+        cast = self._spell_resolver.cast(intent, ctx)
         details: dict[str, Any] = {
-            "spell": spell,
-            "level": level,
-            "casting_time": casting_time,
-            "concentration": concentrates,
+            "spell": cast.spell,
+            "level": cast.cast_level,
+            "casting_time": cast.casting_time,
+            "concentration": cast.concentration,
         }
-
-        resolved = None
-        if spec is not None:
-            resolved = resolve_targets(
-                spec,
-                intent=intent,
-                ctx=ctx,
-                actor=actor,
-                actor_lookup=self.actor_lookup,
-            )
-            details["targeting"] = resolved.to_dict()
-            if not resolved.success:
-                return ActionResolution(
-                    type="cast_spell", actor_id=actor_id,
-                    target_id=getattr(intent, "target_id", None),
-                    success=False,
-                    summary=f"cannot cast {spell or 'spell'}: {resolved.error}",
-                    details=details,
-                )
-
-        # Spell-slot accounting (cantrips / level 0 are free).
-        slot_spent = True
-        if level > 0 and actor is not None and hasattr(actor, "spend_slot"):
-            slot_spent = bool(actor.spend_slot(level))
-            details["slot_spent"] = slot_spent
-            if not slot_spent:
-                return ActionResolution(
-                    type="cast_spell", actor_id=actor_id,
-                    success=False,
-                    summary=f"no level-{level} slot available",
-                    details=details,
-                )
-
-        # Action economy: bonus action / action / reaction.
-        if casting_time == "bonus":
-            ok = self._consume_economy(actor, bonus_action=True)
-        elif casting_time == "reaction":
-            ok = self._consume_economy(actor, reaction=True)
-        else:
-            ok = self._consume_economy(actor, action=True)
-        if not ok:
-            return ActionResolution(
-                type="cast_spell", actor_id=actor_id, success=False,
-                summary=f"cannot cast: {casting_time} already spent",
-                details=details,
-            )
-
-        # Concentration (replaces any active concentration spell).
-        if concentrates and actor is not None:
-            try:
-                from ai_dm.game.combatant_state import Concentration
-                actor.concentration = Concentration(  # type: ignore[attr-defined]
-                    spell_id=str(spell or "unknown"),
-                    name=str(spell or "unknown"),
-                    target_ids=list(resolved.actor_ids) if resolved else [],
-                )
-            except Exception:  # noqa: BLE001 — duck-typed actor without concentration
-                pass
-
-        # Casting breaks stealth.
-        _set_attr(actor, "hidden", False)
-
-        if resolved is not None:
-            details["targets"] = list(resolved.actor_ids)
-
+        if cast.targeting is not None:
+            details["targeting"] = cast.targeting
+        if cast.slot_spent:
+            details["slot_spent"] = True
+        if cast.targets:
+            details["targets"] = list(cast.targets)
+        if cast.outcomes:
+            details["outcomes"] = [o.to_dict() for o in cast.outcomes]
         return ActionResolution(
-            type="cast_spell", actor_id=actor_id,
+            type="cast_spell",
+            actor_id=cast.actor_id,
             target_id=getattr(intent, "target_id", None),
-            success=True,
-            summary=f"casts {spell or 'a spell'}"
-                    + (f" at level {level}" if level > 0 else "")
-                    + (" (concentration)" if concentrates else ""),
+            success=cast.success,
+            summary=cast.summary,
             details=details,
         )
 

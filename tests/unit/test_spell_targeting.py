@@ -248,12 +248,22 @@ def test_resolve_radius_needs_anchor_or_target():
 
 
 # --------------------------------------------------------------------- #
-# resolve_targets — unsupported kinds fail soft
+# resolve_targets — full coverage of the targeting model
 # --------------------------------------------------------------------- #
 
 
-@pytest.mark.parametrize("kind", ["cone", "line", "cube", "sphere", "multi"])
-def test_resolve_unsupported_kind_fails_soft(kind):
+@pytest.mark.parametrize(
+    "kind,error_substr",
+    [
+        ("cone", "anchor"),
+        ("line", "anchor"),
+        ("cube", "anchor"),
+        ("sphere", "anchor"),
+        ("multi", "target_ids"),
+    ],
+)
+def test_resolve_aoe_without_inputs_fails_soft(kind, error_substr):
+    """Without an anchor/candidates, AoE resolution fails soft (no crash)."""
     res = resolve_targets(
         TargetSpec(kind=kind),
         intent=_intent(spell="x"),
@@ -261,7 +271,109 @@ def test_resolve_unsupported_kind_fails_soft(kind):
     )
     assert isinstance(res, ResolvedTargets)
     assert res.success is False
-    assert "not yet supported" in (res.error or "")
+    assert error_substr in (res.error or "")
+
+
+def test_resolve_multi_from_intent_extra():
+    res = resolve_targets(
+        TargetSpec.multi(max_targets=3),
+        intent=_intent(spell="magic_missile",
+                       extra={"target_ids": ["g1", "g2", "g3", "g4"]}),
+        actor=_hero(),
+    )
+    assert res.success and res.actor_ids == ["g1", "g2", "g3"]
+
+
+def test_resolve_point_returns_anchor_only():
+    res = resolve_targets(
+        TargetSpec.point(),
+        intent=_intent(spell="fog_cloud"),
+        actor=_hero(),
+        ctx={"anchor": {"x": 100, "y": 200, "scene_id": "s1"}},
+    )
+    assert res.success is True
+    assert res.actor_ids == []
+    assert res.anchor == {"x": 100.0, "y": 200.0, "scene_id": "s1"}
+
+
+def test_resolve_sphere_via_geometry():
+    """Sphere expansion uses points_in_sphere over candidate ids."""
+    a = _hero(actor_id="a", position=Position(x=0, y=0))
+    b = _hero(actor_id="b", position=Position(x=10, y=0))   # 10 ft away
+    c = _hero(actor_id="c", position=Position(x=40, y=0))   # 40 ft away
+    actors = {"a": a, "b": b, "c": c}
+    res = resolve_targets(
+        TargetSpec.sphere(radius_ft=20),
+        intent=_intent(actor_id="a"),
+        actor=a,
+        actor_lookup=actors.get,
+        ctx={
+            "anchor": {"x": 0, "y": 0},
+            "candidate_ids": ["a", "b", "c"],
+            "pixels_per_foot": 1.0,
+        },
+    )
+    assert res.success
+    assert set(res.actor_ids) == {"a", "b"}
+
+
+def test_resolve_cone_uses_direction():
+    """Cone of 30 ft pointing east should hit only actors in front."""
+    a = _hero(actor_id="a", position=Position(x=0, y=0))
+    east = _hero(actor_id="east", position=Position(x=20, y=0))
+    west = _hero(actor_id="west", position=Position(x=-20, y=0))
+    actors = {"a": a, "east": east, "west": west}
+    res = resolve_targets(
+        TargetSpec.cone(length_ft=30, direction_deg=0.0, anchor="caster"),
+        intent=_intent(actor_id="a"),
+        actor=a,
+        actor_lookup=actors.get,
+        ctx={
+            "candidate_ids": ["east", "west"],
+            "pixels_per_foot": 1.0,
+        },
+    )
+    assert res.success
+    assert res.actor_ids == ["east"]
+
+
+def test_resolve_line_uses_width():
+    a = _hero(actor_id="a", position=Position(x=0, y=0))
+    on  = _hero(actor_id="on",  position=Position(x=10, y=2))   # within 5 ft band
+    off = _hero(actor_id="off", position=Position(x=10, y=20))  # outside
+    actors = {"a": a, "on": on, "off": off}
+    res = resolve_targets(
+        TargetSpec.line(length_ft=30, width_ft=5, direction_deg=0.0),
+        intent=_intent(actor_id="a"),
+        actor=a,
+        actor_lookup=actors.get,
+        ctx={
+            "candidate_ids": ["on", "off"],
+            "pixels_per_foot": 1.0,
+        },
+    )
+    assert res.success
+    assert res.actor_ids == ["on"]
+
+
+def test_resolve_cube_origin_corner():
+    a = _hero(actor_id="a", position=Position(x=0, y=0))
+    inside = _hero(actor_id="in",  position=Position(x=5, y=5))
+    outside = _hero(actor_id="out", position=Position(x=20, y=5))
+    actors = {"a": a, "in": inside, "out": outside}
+    res = resolve_targets(
+        TargetSpec.cube(side_ft=10),
+        intent=_intent(actor_id="a"),
+        actor=a,
+        actor_lookup=actors.get,
+        ctx={
+            "anchor": {"x": 0, "y": 0},
+            "candidate_ids": ["in", "out"],
+            "pixels_per_foot": 1.0,
+        },
+    )
+    assert res.success
+    assert res.actor_ids == ["in"]
 
 
 # --------------------------------------------------------------------- #

@@ -43,6 +43,17 @@ mirror for parity on `ABILITIES`.
 | `conditions.json` | `ai_dm.rules.conditions` | `scripts/srd/conditions.js` | 14 conditions + exhaustion (15 total) |
 | `exhaustion.json` | `ai_dm.rules.exhaustion` | `scripts/srd/exhaustion.js` | one-track 0–6, −2 d20 / −5 ft per level |
 | `death_saves.json` | `ai_dm.rules.death_saves` | `scripts/srd/death_saves.js` | DC 10, 3 successes / 3 failures, nat-20 → 1 HP |
+| `initiative.json` | `ai_dm.rules.initiative` | `scripts/srd/initiative.js` | DEX-based, tie-break by DEX mod then random |
+| `turn_structure.json` | `ai_dm.rules.turn` | `scripts/srd/turn.js` | start/end-of-turn phases, 1 free object interaction |
+| `actions.json` | `ai_dm.rules.actions` | `scripts/srd/actions.js` | action / bonus / reaction / free economy + standard action menu |
+| `movement.json` | `ai_dm.rules.movement` | `scripts/srd/movement.js` | speed budget, difficult terrain, prone crawl, dash |
+| `opportunity_attacks.json` | `ai_dm.rules.opportunity_attack` | `scripts/srd/opportunity_attacks.js` | trigger, reaction usage, blockers |
+| `cover.json` | `ai_dm.rules.cover` | `scripts/srd/cover.js` | none / half (+2) / three-quarters (+5) / total (blocks) |
+| `stealth.json` | `ai_dm.rules.stealth` | `scripts/srd/stealth.js` | hide DC, break triggers, invisibility advantage |
+| `grapple_shove.json` | `ai_dm.rules.grapple` | `scripts/srd/grapple.js` | contested STR (Athletics) vs. STR/DEX, size cap, push or prone |
+| `concentration.json` | `ai_dm.rules.concentration` | `scripts/srd/concentration.js` | Con save DC = max(10, ⌊dmg/2⌋); auto-drop at 0 HP |
+| `areas_of_effect.json` | `ai_dm.rules.areas_of_effect` | `scripts/srd/areas_of_effect.js` | sphere / cube / cone / line / cylinder geometry |
+| `rests.json` | `ai_dm.rules.rests` | `scripts/srd/rests.js` | short rest (HD spend, short resources) / long rest (full HP, slots, -1 exhaustion) |
 
 All of the above are loaded via the cached `srd_core.load(name)`
 helper on the Python side, and via `loadSrdCore()` on the JS side.

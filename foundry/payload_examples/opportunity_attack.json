@@ -1,0 +1,8 @@
+{
+  "type": "opportunity_attack",
+  "encounter_id": "enc_001",
+  "reactor_id": "pc_alice",
+  "mover_id": "npc_goblin_1",
+  "trigger": "leaves_reach"
+}
+

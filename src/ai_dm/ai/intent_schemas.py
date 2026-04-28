@@ -53,5 +53,12 @@ class PlayerIntent(BaseModel):
     raw_text: str = ""
     confidence: float = 0.0  # 0..1
     notes: str | None = None
+    # Optional movement details: distance in feet (e.g. "30 feet
+    # toward the altar") and a direction phrase ("toward", "away",
+    # "north", "ne", ...). When ``distance_ft`` is set without a
+    # ``target_anchor`` the move is interpreted as a free-form push
+    # in ``direction`` from the actor's current position.
+    distance_ft: int | None = None
+    direction: str | None = None
     extra: dict = Field(default_factory=dict)
 

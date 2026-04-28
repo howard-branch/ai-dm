@@ -1,0 +1,16 @@
+{
+  "_doc": "SRD 5.2.1 weapon-property glossary. Keys are short slugs used by weapons.json:properties[].",
+  "properties": [
+    {"key": "ammunition",  "label": "Ammunition",  "summary": "Use ammunition to make a ranged attack; you can draw it as part of the attack."},
+    {"key": "finesse",     "label": "Finesse",     "summary": "When making an attack, use either Strength or Dexterity for the attack and damage rolls."},
+    {"key": "heavy",       "label": "Heavy",       "summary": "Small creatures have disadvantage on attack rolls with Heavy weapons."},
+    {"key": "light",       "label": "Light",       "summary": "When you take the Attack action and attack with a Light weapon, you can use a bonus action to attack with another Light weapon you are holding (no ability-mod damage on the bonus attack)."},
+    {"key": "loading",     "label": "Loading",     "summary": "Regardless of attacks-per-action, you can fire only one piece of ammunition per action, bonus action, or reaction."},
+    {"key": "range",       "label": "Range",       "summary": "Has a normal/long range in feet; disadvantage past normal, can't attack past long."},
+    {"key": "reach",       "label": "Reach",       "summary": "Adds 5 ft to the reach used to make melee attacks and opportunity attacks."},
+    {"key": "thrown",      "label": "Thrown",      "summary": "Can be thrown to make a ranged attack at the listed range."},
+    {"key": "two_handed",  "label": "Two-Handed",  "summary": "Requires two hands to attack with."},
+    {"key": "versatile",   "label": "Versatile",   "summary": "Can be used one- or two-handed; the larger die is rolled when wielded with two hands."}
+  ]
+}
+

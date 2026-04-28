@@ -1,0 +1,9 @@
+{
+  "type": "start_concentration",
+  "actor_id": "pc_alice",
+  "spell_id": "bless",
+  "target_ids": ["pc_alice", "pc_bob"],
+  "save_dc": 13,
+  "started_round": 1
+}
+

@@ -14,10 +14,17 @@ The :class:`DiceRoller` is seedable for deterministic tests.
 """
 from __future__ import annotations
 
+import logging
 import random
 import re
 from dataclasses import dataclass, field
 from typing import Literal
+
+# Every physical die roll the engine performs is emitted at INFO on this
+# logger (one line per call to ``DiceRoller.roll``). Configure
+# ``ai_dm.rules.dice`` separately in ``config/logging.yaml`` if you want
+# to silence it or send it to a dedicated audit file.
+logger = logging.getLogger("ai_dm.rules.dice")
 
 # 2d20kh1, 4d6kl1, 1d8+3, 2d6-1, d20
 _EXPR_RE = re.compile(
@@ -113,7 +120,7 @@ class DiceRoller:
         crit = single_d20 and kept[0] == 20
         fumble = single_d20 and kept[0] == 1
 
-        return RollResult(
+        result = RollResult(
             expression=expression,
             rolls=rolls,
             kept=kept,
@@ -123,6 +130,18 @@ class DiceRoller:
             crit=crit,
             fumble=fumble,
         )
+        # One audit line per roll. ``extra`` carries the structured
+        # payload so log handlers can route or persist it (e.g. a
+        # JSON-lines audit sink) while the human-readable message
+        # stays useful in plain text logs.
+        if logger.isEnabledFor(logging.INFO):
+            tag = " CRIT" if crit else (" FUMBLE" if fumble else "")
+            logger.info(
+                "roll %s [%s] -> rolls=%s kept=%s mod=%+d total=%d%s",
+                expression, advantage, rolls, kept, modifier, total, tag,
+                extra={"dice_roll": result.to_dict()},
+            )
+        return result
 
     @staticmethod
     def _apply_keep(rolls: list[int], keep: str, keep_n: int | None) -> list[int]:
@@ -226,7 +245,7 @@ def d20_test(
             success = total >= target
     elif dc is not None:
         success = total >= dc
-    return D20Test(
+    test = D20Test(
         roll=nat,
         modifier=int(modifier),
         total=total,
@@ -238,4 +257,25 @@ def d20_test(
         success=success,
         raw=rr,
     )
+    # Audit line for the d20 *test* (in addition to the raw roll line
+    # above). Captures the player-visible outcome — DC/AC, success, crit
+    # — that the engine actually decided on.
+    if logger.isEnabledFor(logging.INFO):
+        kind = "attack" if (is_attack or ac is not None) else "check"
+        outcome = (
+            "n/a" if success is None
+            else ("HIT" if success and (is_attack or ac is not None)
+                  else "MISS" if not success and (is_attack or ac is not None)
+                  else "PASS" if success else "FAIL")
+        )
+        logger.info(
+            "%s nat=%d mod=%+d total=%d vs %s=%s -> %s%s",
+            kind, nat, modifier, total,
+            "AC" if (is_attack or ac is not None) else "DC",
+            target if target is not None else "?",
+            outcome,
+            " CRIT" if rr.crit else (" FUMBLE" if rr.fumble else ""),
+            extra={"d20_test": test.to_dict()},
+        )
+    return test
 

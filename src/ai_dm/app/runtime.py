@@ -268,11 +268,40 @@ class Runtime:
         sheet = self._character()
         if not sheet:
             print("[no player character loaded — use :char <id> to load one]")
+            self._explain_missing_character()
             return
         name = sheet.get("name") or sheet.get("id") or "?"
         klass = sheet.get("class")
         suffix = f" — {klass}" if klass else ""
         print(f"[playing as {name}{suffix}]")
+
+    def _explain_missing_character(self) -> None:
+        """Print why no PC is loaded so the user can fix it without trawling logs."""
+        pack = getattr(self.container, "pack", None) if self.container else None
+        if pack is None:
+            print("  reason: no campaign pack resolved — check config/settings.yaml "
+                  "(campaigns.active) and that you're running from the repo root.")
+            return
+        start = (getattr(pack.manifest, "start", None) or {})
+        pc_id = start.get("player_character")
+        if not pc_id:
+            print(f"  reason: campaign {pack.slug!r} has no start.player_character "
+                  f"in its manifest ({pack.root}/campaign.yaml). Add a "
+                  f"'start: {{ player_character: <id> }}' block, or use "
+                  f":char <id> to load one manually.")
+            return
+        live = pack.state.characters / f"{pc_id}.json"
+        seed = pack.paths.characters_seed / f"{pc_id}.json"
+        print(f"  reason: pc_id={pc_id!r} but no sheet was loadable.")
+        print(f"    live: {live} (exists={live.exists()})")
+        print(f"    seed: {seed} (exists={seed.exists()})")
+        if not live.exists() and not seed.exists():
+            print("  fix: run with --new-character (or AI_DM_NEW_CHARACTER=1) and "
+                  "complete the wizard in the connected Foundry browser, or drop "
+                  "a hand-crafted seed JSON at the path above.")
+        else:
+            print("  fix: the file exists but failed to load — check the log "
+                  "above for a JSON parse error, then re-run.")
 
     def _show_character(self) -> None:
         sheet = self._character()

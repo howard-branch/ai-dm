@@ -24,8 +24,11 @@ foundry:
     actor_patch_allow:
       - name
       - img
+      - system.abilities.
       - system.attributes.
       - system.details.
+      - system.skills.
+      - system.spells.
       - system.traits.
   batch:
     atomic_default: true

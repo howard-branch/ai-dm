@@ -1,0 +1,10 @@
+{
+  "type": "start_encounter",
+  "encounter_id": "enc_001",
+  "scene_id": "scene_001",
+  "participants": [
+    {"actor_id": "pc_alice", "team": "party", "initiative_bonus": 3},
+    {"actor_id": "npc_goblin_1", "team": "foe", "initiative_bonus": 2}
+  ]
+}
+

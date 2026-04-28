@@ -148,6 +148,10 @@ async function _dispatchCommand(command) {
           scene_id: command.scene_id ?? null,
           x: command.x ?? null,
           y: command.y ?? null,
+          distance_ft: command.distance_ft ?? null,
+          direction: command.direction ?? null,
+          formation_index: command.formation_index ?? null,
+          formation_count: command.formation_count ?? null,
         });
         return { ok: true, command_type: command.type, ...result };
       }

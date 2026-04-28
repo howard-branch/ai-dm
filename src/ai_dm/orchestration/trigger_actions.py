@@ -75,6 +75,34 @@ def start_encounter(combat, encounter_id: str, participants: list[dict]) -> Acti
     return _a
 
 
+def advance_time(
+    clock,
+    minutes: int,
+    *,
+    reason: str | None = None,
+) -> Action:
+    """Advance the in-game clock by ``minutes``.
+
+    Used by pack triggers like ``intent.travel_resolved`` →
+    ``advance_time: {minutes: 30, reason: "travel"}`` to feed
+    ``time.advanced`` / ``watch.passed`` events that wandering-monster
+    triggers listen on. ``scene_id`` is taken from the firing event's
+    payload so wandering checks know where the party is.
+    """
+    minutes = int(minutes or 0)
+
+    def _a(payload: dict, _ctx: dict) -> None:
+        if clock is None or minutes <= 0:
+            return
+        scene_id = (payload or {}).get("scene_id")
+        try:
+            clock.advance(minutes, reason=reason, scene_id=scene_id)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("trigger advance_time failed: %s", exc)
+
+    return _a
+
+
 def roll_random_encounter(
     event_bus,
     chapters,
@@ -127,6 +155,26 @@ def roll_random_encounter(
                 break
         if chosen is None:
             return
+
+        # Audit line for the table roll itself: which weighted entry
+        # was picked and on what number, so a save/replay shows the
+        # random encounter machinery just as clearly as scripted ones.
+        logger.info(
+            "random_encounter rolled %d/%d -> %s (weight %s) scene=%s",
+            roll, total,
+            chosen.get("encounter_id") or "<no-encounter>",
+            chosen.get("weight"),
+            (payload or {}).get("scene_id"),
+            extra={
+                "random_encounter": {
+                    "roll": roll,
+                    "total_weight": total,
+                    "encounter_id": chosen.get("encounter_id"),
+                    "scene_id": (payload or {}).get("scene_id"),
+                    "seed_key": seed_key,
+                }
+            },
+        )
 
         eid = chosen.get("encounter_id")
         narration = chosen.get("narration") or ""
@@ -214,6 +262,12 @@ def from_spec(spec: dict, *, deps: dict) -> Action:
         return speak(deps["event_bus"], args["text"], args.get("voice"))
     if op == "start_encounter":
         return start_encounter(deps["combat"], args["encounter_id"], args.get("participants", []))
+    if op == "advance_time":
+        return advance_time(
+            deps.get("clock"),
+            args.get("minutes", 0),
+            reason=args.get("reason"),
+        )
     if op == "roll_random_encounter":
         return roll_random_encounter(
             deps["event_bus"],

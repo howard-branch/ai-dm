@@ -50,6 +50,33 @@ function _isPagedEnabled() {
   }
 }
 
+/**
+ * Constrain the DialogV2 window to the browser viewport so its content
+ * scrolls instead of overflowing off-screen. DialogV2 sizes itself to
+ * its content by default; without this, a tall form (lots of
+ * archetypes / shop items / spells) pushes the OK / Cancel buttons
+ * below the fold and the user can't reach them.
+ *
+ * Applied in the ``render`` callback of every wizard dialog. Walks up
+ * from the form root to the Foundry window-app container and pins
+ * ``max-height`` + ``overflow-y: auto`` on the ``.window-content``
+ * scroll region.
+ */
+function constrainDialogToViewport(root) {
+  if (!root) return;
+  const win = root.closest?.(".window-app") || root.closest?.(".application");
+  if (!win) return;
+  // Cap the window itself to ~92% of the viewport. The header + button
+  // row live outside .window-content, so we leave a little slack.
+  win.style.maxHeight = "92vh";
+  const content = win.querySelector(".window-content");
+  if (content) {
+    content.style.maxHeight = "calc(92vh - 6rem)";
+    content.style.overflowY = "auto";
+    content.style.overflowX = "hidden";
+  }
+}
+
 function escapeHtml(s) {
   return String(s ?? "")
     .replace(/&/g, "&amp;")
@@ -228,7 +255,9 @@ function renderForm(payload) {
   return `
     <form class="ai-dm-wizard">
       <style>
-        .ai-dm-wizard { display: flex; flex-direction: column; gap: 0.75rem; }
+        .ai-dm-wizard {
+          display: flex; flex-direction: column; gap: 0.75rem;
+        }
         .ai-dm-wizard fieldset { border: 1px solid #888; padding: 0.5rem; }
         .ai-dm-wizard legend { font-weight: bold; }
         .ai-dm-wizard-option { display: block; padding: 0.25rem 0; cursor: pointer; }
@@ -236,6 +265,12 @@ function renderForm(payload) {
         .ai-dm-wizard-stats { font-size: 0.8em; opacity: 0.7; margin-left: 1.25rem; }
         .ai-dm-wizard input[type="text"] { width: 100%; }
         .ai-dm-wizard-shop-row, .ai-dm-wizard-spell-row { display: block; padding: 0.15rem 0; cursor: pointer; }
+        /* Bound the very long shop / spell lists so a single section
+           can't make the dialog absurdly tall before the outer
+           window-content scroller kicks in. */
+        .ai-dm-wizard-shop, .ai-dm-wizard-spells {
+          max-height: 40vh; overflow-y: auto; padding-right: 0.25rem;
+        }
       </style>
 
       ${errorBlock}
@@ -423,6 +458,7 @@ export async function openCharacterWizard(payload, sendEventToPython) {
           dialog?.element instanceof HTMLElement ? dialog.element :
           event?.target instanceof HTMLElement ? event.target : null;
         try {
+          constrainDialogToViewport(root);
           wireFormDynamics(root);
         } catch (err) {
           console.warn("AI DM Bridge: wizard dynamics wiring failed", err);
@@ -542,7 +578,9 @@ function _archetypeIsCaster(payload, key) {
 function _commonStyles() {
   return `
     <style>
-      .ai-dm-wizard-page { display: flex; flex-direction: column; gap: 0.75rem; }
+      .ai-dm-wizard-page {
+        display: flex; flex-direction: column; gap: 0.75rem;
+      }
       .ai-dm-wizard-page fieldset { border: 1px solid #888; padding: 0.5rem; }
       .ai-dm-wizard-page legend { font-weight: bold; }
       .ai-dm-wizard-page label.opt { display: block; padding: 0.25rem 0; cursor: pointer; }
@@ -550,6 +588,10 @@ function _commonStyles() {
       .ai-dm-wizard-page .stats { font-size: 0.8em; opacity: 0.7; margin-left: 1.25rem; }
       .ai-dm-wizard-page input[type="text"] { width: 100%; }
       .ai-dm-wizard-page .row { display: block; padding: 0.15rem 0; cursor: pointer; }
+      .ai-dm-wizard-page .ai-dm-wizard-shop,
+      .ai-dm-wizard-page .ai-dm-wizard-spells {
+        max-height: 40vh; overflow-y: auto; padding-right: 0.25rem;
+      }
       .ai-dm-wizard-step { font-size: 0.85em; opacity: 0.7; margin-bottom: 0.25rem; }
     </style>`;
 }
@@ -901,7 +943,10 @@ async function _runPage(DialogV2, payload, state, page) {
       const root =
         dialog?.element instanceof HTMLElement ? dialog.element :
         event?.target instanceof HTMLElement ? event.target : null;
-      try { page.wire?.(root); } catch (err) {
+      try {
+        constrainDialogToViewport(root);
+        page.wire?.(root);
+      } catch (err) {
         console.warn("AI DM Bridge: wizard page wiring failed", err);
       }
     },

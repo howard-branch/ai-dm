@@ -1,0 +1,234 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-dm.local/schema/glossary.json",
+  "title": "AI-DM Rules Glossary Entry",
+  "description": "Schema for entries in the SRD 5.2.1 core catalog with split rules_text + typed effects. Backwards-compatible: catalog files may still carry a legacy flat `effects` dict during migration (kept under `effects_legacy`).",
+
+  "$defs": {
+    "Effect": {
+      "oneOf": [
+        { "$ref": "#/$defs/E_movement_cost" },
+        { "$ref": "#/$defs/E_speed_set_to" },
+        { "$ref": "#/$defs/E_speed_modifier" },
+        { "$ref": "#/$defs/E_own_attack_advantage" },
+        { "$ref": "#/$defs/E_own_attack_disadvantage" },
+        { "$ref": "#/$defs/E_attack_advantage_against" },
+        { "$ref": "#/$defs/E_attack_disadvantage_against" },
+        { "$ref": "#/$defs/E_auto_critical_hit_against_within_5ft" },
+        { "$ref": "#/$defs/E_save_auto_fail" },
+        { "$ref": "#/$defs/E_save_advantage" },
+        { "$ref": "#/$defs/E_save_disadvantage" },
+        { "$ref": "#/$defs/E_ability_check_advantage" },
+        { "$ref": "#/$defs/E_ability_check_disadvantage" },
+        { "$ref": "#/$defs/E_auto_fail_check_with_sense" },
+        { "$ref": "#/$defs/E_cant_take_actions" },
+        { "$ref": "#/$defs/E_cant_take_bonus_actions" },
+        { "$ref": "#/$defs/E_cant_take_reactions" },
+        { "$ref": "#/$defs/E_cant_speak" },
+        { "$ref": "#/$defs/E_cant_concentrate" },
+        { "$ref": "#/$defs/E_cant_move_closer_to_source" },
+        { "$ref": "#/$defs/E_cant_target" },
+        { "$ref": "#/$defs/E_social_advantage_for" },
+        { "$ref": "#/$defs/E_damage_resistance_all" },
+        { "$ref": "#/$defs/E_damage_resistance" },
+        { "$ref": "#/$defs/E_damage_immunity" },
+        { "$ref": "#/$defs/E_damage_vulnerability" },
+        { "$ref": "#/$defs/E_condition_immunity" },
+        { "$ref": "#/$defs/E_implies_condition" },
+        { "$ref": "#/$defs/E_d20_penalty_per_level" },
+        { "$ref": "#/$defs/E_speed_penalty_per_level_ft" },
+        { "$ref": "#/$defs/E_max_stack_level" },
+        { "$ref": "#/$defs/E_death_at_max_stack" }
+      ]
+    },
+
+    "E_movement_cost": {
+      "type": "object", "required": ["type", "value"], "additionalProperties": false,
+      "properties": {
+        "type": { "const": "movement_cost" },
+        "value": { "anyOf": [{ "type": "integer" }, { "enum": ["crawl", "double"] }] }
+      }
+    },
+    "E_speed_set_to": {
+      "type": "object", "required": ["type", "value"], "additionalProperties": false,
+      "properties": { "type": { "const": "speed_set_to" }, "value": { "type": "integer", "minimum": 0 } }
+    },
+    "E_speed_modifier": {
+      "type": "object", "required": ["type", "value_ft"], "additionalProperties": false,
+      "properties": { "type": { "const": "speed_modifier" }, "value_ft": { "type": "integer" } }
+    },
+    "E_own_attack_advantage": {
+      "type": "object", "required": ["type"], "additionalProperties": false,
+      "properties": { "type": { "const": "own_attack_advantage" } }
+    },
+    "E_own_attack_disadvantage": {
+      "type": "object", "required": ["type"], "additionalProperties": false,
+      "properties": { "type": { "const": "own_attack_disadvantage" } }
+    },
+    "E_attack_advantage_against": {
+      "type": "object", "required": ["type"], "additionalProperties": false,
+      "properties": {
+        "type": { "const": "attack_advantage_against" },
+        "range": { "enum": ["any", "melee_5ft", "ranged_beyond_5ft"], "default": "any" }
+      }
+    },
+    "E_attack_disadvantage_against": {
+      "type": "object", "required": ["type"], "additionalProperties": false,
+      "properties": {
+        "type": { "const": "attack_disadvantage_against" },
+        "range": { "enum": ["any", "melee_5ft", "ranged_beyond_5ft"], "default": "any" }
+      }
+    },
+    "E_auto_critical_hit_against_within_5ft": {
+      "type": "object", "required": ["type"], "additionalProperties": false,
+      "properties": { "type": { "const": "auto_critical_hit_against_within_5ft" } }
+    },
+    "E_save_auto_fail": {
+      "type": "object", "required": ["type", "abilities"], "additionalProperties": false,
+      "properties": {
+        "type": { "const": "save_auto_fail" },
+        "abilities": { "type": "array", "items": { "enum": ["str", "dex", "con", "int", "wis", "cha"] } }
+      }
+    },
+    "E_save_advantage": {
+      "type": "object", "required": ["type", "abilities"], "additionalProperties": false,
+      "properties": {
+        "type": { "const": "save_advantage" },
+        "abilities": { "type": "array", "items": { "enum": ["str", "dex", "con", "int", "wis", "cha"] } }
+      }
+    },
+    "E_save_disadvantage": {
+      "type": "object", "required": ["type", "abilities"], "additionalProperties": false,
+      "properties": {
+        "type": { "const": "save_disadvantage" },
+        "abilities": { "type": "array", "items": { "enum": ["str", "dex", "con", "int", "wis", "cha"] } }
+      }
+    },
+    "E_ability_check_advantage": {
+      "type": "object", "required": ["type"], "additionalProperties": false,
+      "properties": { "type": { "const": "ability_check_advantage" } }
+    },
+    "E_ability_check_disadvantage": {
+      "type": "object", "required": ["type"], "additionalProperties": false,
+      "properties": { "type": { "const": "ability_check_disadvantage" } }
+    },
+    "E_auto_fail_check_with_sense": {
+      "type": "object", "required": ["type", "sense"], "additionalProperties": false,
+      "properties": {
+        "type": { "const": "auto_fail_check_with_sense" },
+        "sense": { "enum": ["sight", "hearing"] }
+      }
+    },
+    "E_cant_take_actions": {
+      "type": "object", "required": ["type"], "additionalProperties": false,
+      "properties": { "type": { "const": "cant_take_actions" } }
+    },
+    "E_cant_take_bonus_actions": {
+      "type": "object", "required": ["type"], "additionalProperties": false,
+      "properties": { "type": { "const": "cant_take_bonus_actions" } }
+    },
+    "E_cant_take_reactions": {
+      "type": "object", "required": ["type"], "additionalProperties": false,
+      "properties": { "type": { "const": "cant_take_reactions" } }
+    },
+    "E_cant_speak": {
+      "type": "object", "required": ["type"], "additionalProperties": false,
+      "properties": { "type": { "const": "cant_speak" } }
+    },
+    "E_cant_concentrate": {
+      "type": "object", "required": ["type"], "additionalProperties": false,
+      "properties": { "type": { "const": "cant_concentrate" } }
+    },
+    "E_cant_move_closer_to_source": {
+      "type": "object", "required": ["type"], "additionalProperties": false,
+      "properties": { "type": { "const": "cant_move_closer_to_source" } }
+    },
+    "E_cant_target": {
+      "type": "object", "required": ["type", "target"], "additionalProperties": false,
+      "properties": {
+        "type": { "const": "cant_target" },
+        "target": { "enum": ["charmer", "source"] }
+      }
+    },
+    "E_social_advantage_for": {
+      "type": "object", "required": ["type", "actor"], "additionalProperties": false,
+      "properties": {
+        "type": { "const": "social_advantage_for" },
+        "actor": { "enum": ["charmer", "source"] }
+      }
+    },
+    "E_damage_resistance_all": {
+      "type": "object", "required": ["type"], "additionalProperties": false,
+      "properties": { "type": { "const": "damage_resistance_all" } }
+    },
+    "E_damage_resistance": {
+      "type": "object", "required": ["type", "damage_types"], "additionalProperties": false,
+      "properties": {
+        "type": { "const": "damage_resistance" },
+        "damage_types": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "E_damage_immunity": {
+      "type": "object", "required": ["type", "damage_types"], "additionalProperties": false,
+      "properties": {
+        "type": { "const": "damage_immunity" },
+        "damage_types": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "E_damage_vulnerability": {
+      "type": "object", "required": ["type", "damage_types"], "additionalProperties": false,
+      "properties": {
+        "type": { "const": "damage_vulnerability" },
+        "damage_types": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "E_condition_immunity": {
+      "type": "object", "required": ["type", "conditions"], "additionalProperties": false,
+      "properties": {
+        "type": { "const": "condition_immunity" },
+        "conditions": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "E_implies_condition": {
+      "type": "object", "required": ["type", "condition"], "additionalProperties": false,
+      "properties": {
+        "type": { "const": "implies_condition" },
+        "condition": { "type": "string" }
+      }
+    },
+
+    "E_d20_penalty_per_level": {
+      "type": "object", "required": ["type", "value"], "additionalProperties": false,
+      "properties": { "type": { "const": "d20_penalty_per_level" }, "value": { "type": "integer" } }
+    },
+    "E_speed_penalty_per_level_ft": {
+      "type": "object", "required": ["type", "value"], "additionalProperties": false,
+      "properties": { "type": { "const": "speed_penalty_per_level_ft" }, "value": { "type": "integer" } }
+    },
+    "E_max_stack_level": {
+      "type": "object", "required": ["type", "value"], "additionalProperties": false,
+      "properties": { "type": { "const": "max_stack_level" }, "value": { "type": "integer", "minimum": 1 } }
+    },
+    "E_death_at_max_stack": {
+      "type": "object", "required": ["type"], "additionalProperties": false,
+      "properties": { "type": { "const": "death_at_max_stack" } }
+    },
+
+    "GlossaryEntry": {
+      "type": "object",
+      "required": ["key", "label"],
+      "properties": {
+        "key": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "label": { "type": "string", "minLength": 1 },
+        "category": { "type": "string" },
+        "rules_text": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "source": { "type": "string", "default": "SRD 5.2.1" },
+        "stackable": { "type": "boolean" },
+        "effects": { "type": "array", "items": { "$ref": "#/$defs/Effect" } },
+        "effects_legacy": { "type": "object" }
+      }
+    }
+  }
+}
+

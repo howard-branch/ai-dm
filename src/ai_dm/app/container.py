@@ -40,6 +40,7 @@ from ai_dm.foundry.socket_bridge import SocketBridge
 from ai_dm.foundry.sync_service import SyncService
 from ai_dm.foundry.validator import CommandValidator
 from ai_dm.game.combat_machine import CombatMachine
+from ai_dm.game.clock import Clock
 from ai_dm.game.location_loader import load_directory as load_locations_dir
 from ai_dm.game.location_service import LocationService
 from ai_dm.game.timeline import Timeline
@@ -150,6 +151,7 @@ class Container:
     timeline: Optional[Timeline] = None
     chapter_service: Optional[ChapterService] = None
     story_planner: Optional[StoryPlanner] = None
+    clock: Optional[Clock] = None
     tts: Optional[TTSBackend] = None
     audio_queue: Optional[AudioQueue] = None
     narration_dispatcher: Optional[NarrationDispatcher] = None
@@ -267,10 +269,16 @@ class Container:
         combat = CombatMachine(event_bus=event_bus, command_router=router)
         turn_manager = TurnManager(combat=combat)
 
+        # In-game clock — constructed early so IntentRouter and the
+        # trigger engine can both reach it. Save state is restored
+        # below if a campaign save exists.
+        clock = Clock(event_bus=event_bus)
+
         intent_router = IntentRouter(
             action_resolver=action_resolver,
             command_router=router,
             event_bus=event_bus,
+            clock=clock,
         )
 
         # ---- Phase 3: planner ---- #
@@ -340,6 +348,7 @@ class Container:
         actor_state: dict[str, Any] = {}
         foundry_journals: dict[str, Any] = {}
 
+
         triggers: TriggerEngine | None = None
         if cfg.triggers_enabled:
             triggers = TriggerEngine(
@@ -348,6 +357,7 @@ class Container:
                     "flags": flags,
                     "actors": actor_state,
                     "chapter": story_planner.state.current_chapter,
+                    "clock": clock.snapshot(),
                 },
             )
             try:
@@ -357,6 +367,7 @@ class Container:
                     "flags": flags,
                     "combat": combat,
                     "chapters": chapter_service,
+                    "clock": clock,
                 }
                 triggers.load(load_triggers(pack.paths.triggers, deps=deps))
             except Exception:  # noqa: BLE001
@@ -424,6 +435,7 @@ class Container:
             triggers=triggers,
             foundry_journals=foundry_journals,
             actor_state=actor_state,
+            clock=clock,
         )
 
         if cfg.auto_load and campaign_store.save_path.exists():
@@ -499,6 +511,7 @@ class Container:
             timeline=timeline,
             chapter_service=chapter_service,
             story_planner=story_planner,
+            clock=clock,
             tts=tts,
             audio_queue=audio_queue,
             narration_dispatcher=narration_dispatcher,

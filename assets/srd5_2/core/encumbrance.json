@@ -1,0 +1,17 @@
+{
+  "_doc": "SRD 5.2.1 carrying capacity rules + the optional encumbrance variant. Default rule: capacity = 15 × STR (lb); push/drag/lift = 30 × STR. Variant rule (DMG): encumbered at 5 × STR, heavily encumbered at 10 × STR, max 15 × STR — speed penalties and (at 'heavy') broad disadvantage.",
+  "carrying_capacity_per_str": 15,
+  "push_drag_lift_per_str": 30,
+  "variant": {
+    "encumbered_per_str": 5,
+    "heavily_encumbered_per_str": 10,
+    "max_per_str": 15,
+    "encumbered_speed_penalty_ft": -10,
+    "heavily_encumbered_speed_penalty_ft": -20,
+    "heavily_encumbered_disadvantage": [
+      "str_check", "dex_check", "con_check", "attack",
+      "str_save", "dex_save", "con_save"
+    ]
+  }
+}
+

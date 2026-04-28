@@ -1,0 +1,6 @@
+{
+  "type": "gain_currency",
+  "actor_id": "pc_morgana",
+  "coins": {"gp": 100, "ep": 2}
+}
+

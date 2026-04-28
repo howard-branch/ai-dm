@@ -3,7 +3,11 @@ from __future__ import annotations
 
 from typing import Iterable, Protocol
 
-from ai_dm.app.opening_scene import build_scene_brief
+from ai_dm.app.opening_scene import (
+    build_scene_brief,
+    find_chapter_scene,
+    find_scene_node,
+)
 from ai_dm.campaign.pack import CampaignPack
 from ai_dm.game.location_service import LocationService
 from ai_dm.memory.npc_memory import NPCMemoryStore
@@ -83,8 +87,17 @@ class PromptContextBuilder:
                 })
             context["npc_briefs"] = briefs
 
-        if scene_id and self.location_service is not None:
-            scene = self.location_service.get_scene(scene_id)
+        # Resolve the caller's ``scene_id`` (often Foundry's opaque id
+        # from chat events) to a campaign-pack scene id so downstream
+        # lookups (`location_service.get_scene`, `build_scene_brief`)
+        # actually find the *current* scene rather than silently
+        # falling back to the manifest's start. The story planner is
+        # the authoritative source: ``StoryPlanner.enter_scene`` is
+        # invoked on every successful travel.
+        pack_scene_id = self._resolve_pack_scene_id(scene_id)
+
+        if pack_scene_id and self.location_service is not None:
+            scene = self.location_service.get_scene(pack_scene_id)
             if scene is not None:
                 context["scene_locations"] = scene.model_dump()
 
@@ -93,8 +106,12 @@ class PromptContextBuilder:
         # at least one of these into its prose so the player keeps a
         # sense of available actions on every turn, not just at start.
         if self.pack is not None:
-            brief = build_scene_brief(self.pack, scene_id)
-            if brief is None and self._last_brief_scene:
+            brief = build_scene_brief(self.pack, pack_scene_id)
+            # Only fall back to the previously-cached brief if we
+            # couldn't resolve a pack scene at all this turn — never
+            # when the planner has moved on. Otherwise scene 1's brief
+            # would permanently shadow scene 2 after travel.
+            if brief is None and not pack_scene_id and self._last_brief_scene:
                 brief = build_scene_brief(self.pack, self._last_brief_scene)
             if brief is not None:
                 context["scene_brief"] = brief
@@ -110,4 +127,35 @@ class PromptContextBuilder:
 
         context["player_input"] = player_input
         return context
+
+    # ------------------------------------------------------------------ #
+
+    def _resolve_pack_scene_id(self, scene_id: str | None) -> str | None:
+        """Map ``scene_id`` (which is often Foundry's opaque id) to a
+        pack-side scene node id. Resolution order:
+
+        1. ``scene_id`` itself if it matches a pack node *or* a chapter
+           scene id (``chapters/<chap>/scenes.json``). Chapter scene ids
+           are the planner's currency after travel; treating them as
+           valid here stops ``build_scene_brief`` from silently falling
+           back to the manifest's start scene every turn.
+        2. ``story_planner.state.current_scene`` — set by
+           ``StoryPlanner.enter_scene`` on bootstrap and on every
+           successful travel, so it tracks the player's *narrative*
+           location even when chat events carry an opaque Foundry id.
+        3. ``scene_id`` unchanged (let downstream callers decide).
+        """
+        if self.pack is not None and scene_id and (
+            find_scene_node(self.pack, scene_id) is not None
+            or find_chapter_scene(self.pack, scene_id) is not None
+        ):
+            return scene_id
+        try:
+            ps = getattr(self.story_planner, "state", None)
+            cur = getattr(ps, "current_scene", None) if ps else None
+            if cur:
+                return cur
+        except Exception:  # noqa: BLE001
+            pass
+        return scene_id
 

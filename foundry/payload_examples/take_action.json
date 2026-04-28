@@ -1,0 +1,7 @@
+{
+  "type": "take_action",
+  "encounter_id": "enc_001",
+  "actor_id": "pc_alice",
+  "action": "dash"
+}
+

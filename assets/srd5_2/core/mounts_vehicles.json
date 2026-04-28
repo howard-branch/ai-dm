@@ -1,0 +1,36 @@
+{
+  "_doc": "SRD 5.2.1 mounts, draft animals, tack, and vehicles. kind ∈ {mount,draft,vehicle_land,vehicle_water,tack}. speed_ft applies to mounts/draft/land vehicles; sea vehicles use speed_mph. carry_capacity_lb is for animals; cargo_tons + crew + passengers for vehicles.",
+  "entries": [
+    {"key": "camel",               "name": "Camel",               "kind": "mount",         "cost": {"amount": 50,  "unit": "gp"}, "speed_ft": 50, "carry_capacity_lb": 480},
+    {"key": "donkey",              "name": "Donkey (or Mule)",    "kind": "mount",         "cost": {"amount": 8,   "unit": "gp"}, "speed_ft": 40, "carry_capacity_lb": 420},
+    {"key": "elephant",            "name": "Elephant",            "kind": "mount",         "cost": {"amount": 200, "unit": "gp"}, "speed_ft": 40, "carry_capacity_lb": 1320},
+    {"key": "horse_draft",         "name": "Horse, Draft",        "kind": "draft",         "cost": {"amount": 50,  "unit": "gp"}, "speed_ft": 40, "carry_capacity_lb": 540},
+    {"key": "horse_riding",        "name": "Horse, Riding",       "kind": "mount",         "cost": {"amount": 75,  "unit": "gp"}, "speed_ft": 60, "carry_capacity_lb": 480},
+    {"key": "mastiff",             "name": "Mastiff",             "kind": "mount",         "cost": {"amount": 25,  "unit": "gp"}, "speed_ft": 40, "carry_capacity_lb": 195},
+    {"key": "pony",                "name": "Pony",                "kind": "mount",         "cost": {"amount": 30,  "unit": "gp"}, "speed_ft": 40, "carry_capacity_lb": 225},
+    {"key": "warhorse",            "name": "Warhorse",            "kind": "mount",         "cost": {"amount": 400, "unit": "gp"}, "speed_ft": 60, "carry_capacity_lb": 540},
+
+    {"key": "barding_chain",       "name": "Barding (Chain Mail)","kind": "tack", "cost": {"amount": 300, "unit": "gp"}, "weight": 220},
+    {"key": "bit_and_bridle",      "name": "Bit and Bridle",      "kind": "tack", "cost": {"amount": 2,   "unit": "gp"}, "weight": 1},
+    {"key": "saddle_riding",       "name": "Saddle, Riding",      "kind": "tack", "cost": {"amount": 10,  "unit": "gp"}, "weight": 25},
+    {"key": "saddle_military",     "name": "Saddle, Military",    "kind": "tack", "cost": {"amount": 20,  "unit": "gp"}, "weight": 30},
+    {"key": "saddle_exotic",       "name": "Saddle, Exotic",      "kind": "tack", "cost": {"amount": 60,  "unit": "gp"}, "weight": 40},
+    {"key": "saddle_pack",         "name": "Saddle, Pack",        "kind": "tack", "cost": {"amount": 5,   "unit": "gp"}, "weight": 15},
+    {"key": "saddlebags",          "name": "Saddlebags",          "kind": "tack", "cost": {"amount": 4,   "unit": "gp"}, "weight": 8},
+    {"key": "stabling_per_day",    "name": "Stabling (per day)",  "kind": "tack", "cost": {"amount": 5,   "unit": "sp"}, "weight": 0},
+
+    {"key": "cart",                "name": "Cart",                "kind": "vehicle_land",  "cost": {"amount": 15,  "unit": "gp"}, "speed_ft": 0,  "cargo_tons": 0.1, "crew": 1, "passengers": 0},
+    {"key": "carriage",            "name": "Carriage",            "kind": "vehicle_land",  "cost": {"amount": 100, "unit": "gp"}, "speed_ft": 0,  "cargo_tons": 0.5, "crew": 1, "passengers": 4},
+    {"key": "chariot",             "name": "Chariot",             "kind": "vehicle_land",  "cost": {"amount": 250, "unit": "gp"}, "speed_ft": 0,  "cargo_tons": 0.05, "crew": 1, "passengers": 1},
+    {"key": "sled",                "name": "Sled",                "kind": "vehicle_land",  "cost": {"amount": 20,  "unit": "gp"}, "speed_ft": 0,  "cargo_tons": 0.1, "crew": 1, "passengers": 0},
+    {"key": "wagon",               "name": "Wagon",               "kind": "vehicle_land",  "cost": {"amount": 35,  "unit": "gp"}, "speed_ft": 0,  "cargo_tons": 1,   "crew": 1, "passengers": 0},
+
+    {"key": "rowboat",             "name": "Rowboat",             "kind": "vehicle_water", "cost": {"amount": 50,   "unit": "gp"},  "speed_mph": 1.5,  "cargo_tons": 0,   "crew": 1,   "passengers": 3,    "hp": 50,  "ac": 11, "damage_threshold": 10},
+    {"key": "keelboat",            "name": "Keelboat",            "kind": "vehicle_water", "cost": {"amount": 3000, "unit": "gp"},  "speed_mph": 1,    "cargo_tons": 0.5, "crew": 1,   "passengers": 6,    "hp": 100, "ac": 15, "damage_threshold": 10},
+    {"key": "longship",            "name": "Longship",            "kind": "vehicle_water", "cost": {"amount": 10000,"unit": "gp"},  "speed_mph": 3,    "cargo_tons": 10,  "crew": 40,  "passengers": 150,  "hp": 300, "ac": 15, "damage_threshold": 15},
+    {"key": "sailing_ship",        "name": "Sailing Ship",        "kind": "vehicle_water", "cost": {"amount": 10000,"unit": "gp"},  "speed_mph": 2,    "cargo_tons": 100, "crew": 20,  "passengers": 20,   "hp": 300, "ac": 15, "damage_threshold": 15},
+    {"key": "warship",             "name": "Warship",             "kind": "vehicle_water", "cost": {"amount": 25000,"unit": "gp"},  "speed_mph": 2.5,  "cargo_tons": 200, "crew": 60,  "passengers": 60,   "hp": 500, "ac": 15, "damage_threshold": 20},
+    {"key": "galley",              "name": "Galley",              "kind": "vehicle_water", "cost": {"amount": 30000,"unit": "gp"},  "speed_mph": 4,    "cargo_tons": 150, "crew": 80,  "passengers": 80,   "hp": 500, "ac": 15, "damage_threshold": 20}
+  ]
+}
+

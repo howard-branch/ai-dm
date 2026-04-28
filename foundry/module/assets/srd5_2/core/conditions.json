@@ -1,9 +1,17 @@
 {
+  "$schema": "./_glossary.schema.json",
   "conditions": [
     {
       "key": "blinded",
       "label": "Blinded",
-      "effects": {
+      "rules_text": "While you have the Blinded condition, you experience the following effects. Can't See. You can't see and automatically fail any ability check that requires sight. Attacks Affected. Attack rolls against you have Advantage, and your attack rolls have Disadvantage.",
+      "tags": ["sense", "vision"],
+      "effects": [
+        { "type": "own_attack_disadvantage" },
+        { "type": "attack_advantage_against", "range": "any" },
+        { "type": "auto_fail_check_with_sense", "sense": "sight" }
+      ],
+      "effects_legacy": {
         "attacker_disadvantage": true,
         "target_advantage": true,
         "auto_fail_sight_checks": true
@@ -12,7 +20,13 @@
     {
       "key": "charmed",
       "label": "Charmed",
-      "effects": {
+      "rules_text": "While you have the Charmed condition, you experience the following effects. Can't Harm the Charmer. You can't attack the charmer or target the charmer with damaging abilities or magical effects. Social Advantage. The charmer has Advantage on any ability check to interact with you socially.",
+      "tags": ["mental"],
+      "effects": [
+        { "type": "cant_target", "target": "charmer" },
+        { "type": "social_advantage_for", "actor": "charmer" }
+      ],
+      "effects_legacy": {
         "cant_attack_charmer": true,
         "charmer_advantage_on_social": true
       }
@@ -20,14 +34,26 @@
     {
       "key": "deafened",
       "label": "Deafened",
-      "effects": {
+      "rules_text": "While you have the Deafened condition, you experience the following effect. Can't Hear. You can't hear and automatically fail any ability check that requires hearing.",
+      "tags": ["sense", "hearing"],
+      "effects": [
+        { "type": "auto_fail_check_with_sense", "sense": "hearing" }
+      ],
+      "effects_legacy": {
         "auto_fail_hearing_checks": true
       }
     },
     {
       "key": "frightened",
       "label": "Frightened",
-      "effects": {
+      "rules_text": "While you have the Frightened condition, you experience the following effects. Ability Checks and Attacks Affected. You have Disadvantage on ability checks and attack rolls while the source of fear is within line of sight. Can't Approach. You can't willingly move closer to the source of fear.",
+      "tags": ["mental", "fear"],
+      "effects": [
+        { "type": "own_attack_disadvantage" },
+        { "type": "ability_check_disadvantage" },
+        { "type": "cant_move_closer_to_source" }
+      ],
+      "effects_legacy": {
         "attacker_disadvantage": true,
         "ability_check_disadvantage": true,
         "cant_move_closer_to_source": true
@@ -36,7 +62,13 @@
     {
       "key": "grappled",
       "label": "Grappled",
-      "effects": {
+      "rules_text": "While you have the Grappled condition, you experience the following effects. Speed 0. Your Speed is 0 and can't increase. Attacks Affected. You have Disadvantage on attack rolls against any target other than the grappler. Movable. The grappler can drag or carry you when it moves, but every foot of movement costs it 1 extra foot unless you are Tiny or two or more sizes smaller than it.",
+      "tags": ["physical", "restraint"],
+      "effects": [
+        { "type": "own_attack_disadvantage" },
+        { "type": "speed_set_to", "value": 0 }
+      ],
+      "effects_legacy": {
         "attacker_disadvantage": true,
         "speed_zero": true
       }
@@ -44,7 +76,14 @@
     {
       "key": "incapacitated",
       "label": "Incapacitated",
-      "effects": {
+      "rules_text": "While you have the Incapacitated condition, you experience the following effects. Inactive. You can't take any action, Bonus Action, or Reaction. No Concentration. Your Concentration is broken. Speechless. You can't speak. Surprised. If you're Incapacitated when you roll Initiative, you have Disadvantage on the roll.",
+      "tags": ["action_economy"],
+      "effects": [
+        { "type": "cant_take_actions" },
+        { "type": "cant_take_bonus_actions" },
+        { "type": "cant_take_reactions" }
+      ],
+      "effects_legacy": {
         "no_actions": true,
         "no_bonus_actions": true,
         "no_reactions": true
@@ -53,7 +92,13 @@
     {
       "key": "invisible",
       "label": "Invisible",
-      "effects": {
+      "rules_text": "While you have the Invisible condition, you experience the following effects. Surprise. If you're Invisible when you roll Initiative, you have Advantage on the roll. Concealed. You aren't affected by any effect that requires its target to be seen unless the effect's creator can somehow see you. Any equipment you are wearing or carrying is also concealed. Attacks Affected. Attack rolls against you have Disadvantage, and your attack rolls have Advantage. If a creature can somehow see you, you don't gain this benefit against that creature.",
+      "tags": ["concealment"],
+      "effects": [
+        { "type": "own_attack_advantage" },
+        { "type": "attack_disadvantage_against", "range": "any" }
+      ],
+      "effects_legacy": {
         "attacker_advantage": true,
         "target_disadvantage": true
       }
@@ -61,7 +106,16 @@
     {
       "key": "paralyzed",
       "label": "Paralyzed",
-      "effects": {
+      "rules_text": "While you have the Paralyzed condition, you experience the following effects. Incapacitated. You have the Incapacitated condition. Speed 0. Your Speed is 0 and can't increase. Saving Throws Affected. You automatically fail Strength and Dexterity saving throws. Attacks Affected. Attack rolls against you have Advantage. Automatic Critical Hits. Any attack roll that hits you is a Critical Hit if the attacker is within 5 feet of you.",
+      "tags": ["physical", "restraint"],
+      "effects": [
+        { "type": "implies_condition", "condition": "incapacitated" },
+        { "type": "speed_set_to", "value": 0 },
+        { "type": "save_auto_fail", "abilities": ["str", "dex"] },
+        { "type": "attack_advantage_against", "range": "any" },
+        { "type": "auto_critical_hit_against_within_5ft" }
+      ],
+      "effects_legacy": {
         "incapacitated_implied": true,
         "speed_zero": true,
         "auto_fail_saves": ["str", "dex"],
@@ -72,7 +126,17 @@
     {
       "key": "petrified",
       "label": "Petrified",
-      "effects": {
+      "rules_text": "While you have the Petrified condition, you experience the following effects. Turned to Inanimate Substance. You are transformed, along with any nonmagical objects you are wearing and carrying, into a solid inanimate substance (usually stone). Your weight increases by a factor of ten, and you cease aging. Incapacitated. You have the Incapacitated condition. Speed 0. Your Speed is 0 and can't increase. Attacks Affected. Attack rolls against you have Advantage. Saving Throws Affected. You automatically fail Strength and Dexterity saving throws. Resist Damage. You have Resistance to all damage. Poison Immunity. You have Immunity to the Poisoned condition.",
+      "tags": ["physical", "transformation"],
+      "effects": [
+        { "type": "implies_condition", "condition": "incapacitated" },
+        { "type": "speed_set_to", "value": 0 },
+        { "type": "save_auto_fail", "abilities": ["str", "dex"] },
+        { "type": "attack_advantage_against", "range": "any" },
+        { "type": "damage_resistance_all" },
+        { "type": "condition_immunity", "conditions": ["poisoned"] }
+      ],
+      "effects_legacy": {
         "incapacitated_implied": true,
         "speed_zero": true,
         "auto_fail_saves": ["str", "dex"],
@@ -84,7 +148,13 @@
     {
       "key": "poisoned",
       "label": "Poisoned",
-      "effects": {
+      "rules_text": "While you have the Poisoned condition, you experience the following effect. Ability Checks and Attacks Affected. You have Disadvantage on attack rolls and ability checks.",
+      "tags": ["physical"],
+      "effects": [
+        { "type": "own_attack_disadvantage" },
+        { "type": "ability_check_disadvantage" }
+      ],
+      "effects_legacy": {
         "attacker_disadvantage": true,
         "ability_check_disadvantage": true
       }
@@ -92,7 +162,14 @@
     {
       "key": "prone",
       "label": "Prone",
-      "effects": {
+      "rules_text": "While you have the Prone condition, you experience the following effects. Restricted Movement. Your only movement options are to crawl or to spend an amount of movement equal to half your Speed (round down) to right yourself and thereby end the condition. If your Speed is 0, you can't right yourself. Attacks Affected. You have Disadvantage on attack rolls. An attack roll against you has Advantage if the attacker is within 5 feet of you. Otherwise, that attack roll has Disadvantage.",
+      "tags": ["physical", "movement"],
+      "effects": [
+        { "type": "own_attack_disadvantage" },
+        { "type": "attack_advantage_against", "range": "melee_5ft" },
+        { "type": "attack_disadvantage_against", "range": "ranged_beyond_5ft" }
+      ],
+      "effects_legacy": {
         "attacker_disadvantage": true,
         "target_advantage_melee": true,
         "target_disadvantage_ranged": true
@@ -101,7 +178,15 @@
     {
       "key": "restrained",
       "label": "Restrained",
-      "effects": {
+      "rules_text": "While you have the Restrained condition, you experience the following effects. Speed 0. Your Speed is 0 and can't increase. Attacks Affected. Attack rolls against you have Advantage, and your attack rolls have Disadvantage. Saving Throws Affected. You have Disadvantage on Dexterity saving throws.",
+      "tags": ["physical", "restraint"],
+      "effects": [
+        { "type": "own_attack_disadvantage" },
+        { "type": "attack_advantage_against", "range": "any" },
+        { "type": "speed_set_to", "value": 0 },
+        { "type": "save_disadvantage", "abilities": ["dex"] }
+      ],
+      "effects_legacy": {
         "attacker_disadvantage": true,
         "target_advantage": true,
         "speed_zero": true,
@@ -111,7 +196,15 @@
     {
       "key": "stunned",
       "label": "Stunned",
-      "effects": {
+      "rules_text": "While you have the Stunned condition, you experience the following effects. Incapacitated. You have the Incapacitated condition. Saving Throws Affected. You automatically fail Strength and Dexterity saving throws. Attacks Affected. Attack rolls against you have Advantage.",
+      "tags": ["mental", "physical"],
+      "effects": [
+        { "type": "implies_condition", "condition": "incapacitated" },
+        { "type": "speed_set_to", "value": 0 },
+        { "type": "save_auto_fail", "abilities": ["str", "dex"] },
+        { "type": "attack_advantage_against", "range": "any" }
+      ],
+      "effects_legacy": {
         "incapacitated_implied": true,
         "speed_zero": true,
         "auto_fail_saves": ["str", "dex"],
@@ -121,7 +214,17 @@
     {
       "key": "unconscious",
       "label": "Unconscious",
-      "effects": {
+      "rules_text": "While you have the Unconscious condition, you experience the following effects. Inert. You have the Incapacitated and Prone conditions, and you drop whatever you're holding. When this condition ends, you remain Prone. Speed 0. Your Speed is 0 and can't increase. Attacks Affected. Attack rolls against you have Advantage. Saving Throws Affected. You automatically fail Strength and Dexterity saving throws. Automatic Critical Hits. Any attack roll that hits you is a Critical Hit if the attacker is within 5 feet of you. Unaware. You're unaware of your surroundings.",
+      "tags": ["physical", "mental"],
+      "effects": [
+        { "type": "implies_condition", "condition": "incapacitated" },
+        { "type": "implies_condition", "condition": "prone" },
+        { "type": "speed_set_to", "value": 0 },
+        { "type": "save_auto_fail", "abilities": ["str", "dex"] },
+        { "type": "attack_advantage_against", "range": "any" },
+        { "type": "auto_critical_hit_against_within_5ft" }
+      ],
+      "effects_legacy": {
         "incapacitated_implied": true,
         "prone_implied": true,
         "speed_zero": true,
@@ -134,7 +237,15 @@
       "key": "exhaustion",
       "label": "Exhaustion",
       "stackable": true,
-      "effects": {
+      "rules_text": "While you have the Exhaustion condition, you experience the following effects. Exhaustion Levels. This condition is cumulative. Each time you receive it, you gain 1 Exhaustion level. You die if your Exhaustion level is 6. D20 Tests Affected. When you make a D20 Test, the roll is reduced by 2 times your Exhaustion level. Speed Reduced. Your Speed is reduced by a number of feet equal to 5 times your Exhaustion level. Removing Exhaustion Levels. Finishing a Long Rest removes 1 of your Exhaustion levels. When your Exhaustion level reaches 0, the condition ends.",
+      "tags": ["stacking"],
+      "effects": [
+        { "type": "d20_penalty_per_level", "value": -2 },
+        { "type": "speed_penalty_per_level_ft", "value": -5 },
+        { "type": "max_stack_level", "value": 6 },
+        { "type": "death_at_max_stack" }
+      ],
+      "effects_legacy": {
         "d20_penalty_per_level": -2,
         "speed_penalty_per_level_ft": -5,
         "max_level": 6,
@@ -143,4 +254,3 @@
     }
   ]
 }
-
