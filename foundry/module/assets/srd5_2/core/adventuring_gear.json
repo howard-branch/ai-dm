@@ -1,0 +1,70 @@
+{
+  "_doc": "SRD 5.2.1 adventuring gear, ammunition, focuses and equipment packs. category ∈ {gear,pack,ammunition,focus,consumable,container}. quantity = pieces in a stock bundle (e.g. 20 arrows). container_capacity_lb / contents only meaningful for containers and packs.",
+  "items": [
+    {"key": "arrows_20",       "name": "Arrows (20)",       "category": "ammunition", "cost": {"amount": 1,  "unit": "gp"}, "weight": 1,    "quantity": 20, "ammunition_type": "arrow"},
+    {"key": "bolts_20",        "name": "Bolts (20)",        "category": "ammunition", "cost": {"amount": 1,  "unit": "gp"}, "weight": 1.5,  "quantity": 20, "ammunition_type": "bolt"},
+    {"key": "blowgun_needles_50","name": "Blowgun Needles (50)","category": "ammunition","cost": {"amount":1,"unit":"gp"},"weight": 1, "quantity": 50, "ammunition_type": "blowgun_needle"},
+    {"key": "sling_bullets_20","name": "Sling Bullets (20)","category": "ammunition","cost": {"amount": 4, "unit": "cp"}, "weight": 1.5, "quantity": 20, "ammunition_type": "sling_bullet"},
+    {"key": "firearm_bullets_10","name": "Firearm Bullets (10)","category": "ammunition","cost": {"amount":3,"unit":"gp"},"weight": 2, "quantity": 10, "ammunition_type": "firearm_bullet"},
+
+    {"key": "backpack",        "name": "Backpack",          "category": "container", "cost": {"amount": 2,  "unit": "gp"}, "weight": 5, "container_capacity_lb": 30},
+    {"key": "pouch",           "name": "Pouch",             "category": "container", "cost": {"amount": 5,  "unit": "sp"}, "weight": 1, "container_capacity_lb": 6},
+    {"key": "quiver",          "name": "Quiver",            "category": "container", "cost": {"amount": 1,  "unit": "gp"}, "weight": 1, "container_capacity_lb": 4},
+    {"key": "sack",            "name": "Sack",              "category": "container", "cost": {"amount": 1,  "unit": "cp"}, "weight": 0.5, "container_capacity_lb": 30},
+
+    {"key": "bedroll",         "name": "Bedroll",           "category": "gear", "cost": {"amount": 1, "unit": "gp"}, "weight": 7},
+    {"key": "blanket",         "name": "Blanket",           "category": "gear", "cost": {"amount": 5, "unit": "sp"}, "weight": 3},
+    {"key": "candle",          "name": "Candle",            "category": "gear", "cost": {"amount": 1, "unit": "cp"}, "weight": 0},
+    {"key": "chain_10ft",      "name": "Chain (10 ft)",     "category": "gear", "cost": {"amount": 5, "unit": "gp"}, "weight": 10},
+    {"key": "crowbar",         "name": "Crowbar",           "category": "gear", "cost": {"amount": 2, "unit": "gp"}, "weight": 5},
+    {"key": "grappling_hook",  "name": "Grappling Hook",    "category": "gear", "cost": {"amount": 2, "unit": "gp"}, "weight": 4},
+    {"key": "hammer",          "name": "Hammer",            "category": "gear", "cost": {"amount": 1, "unit": "gp"}, "weight": 3},
+    {"key": "lantern_hooded",  "name": "Hooded Lantern",    "category": "gear", "cost": {"amount": 5, "unit": "gp"}, "weight": 2},
+    {"key": "lantern_bullseye","name": "Bullseye Lantern",  "category": "gear", "cost": {"amount": 10,"unit": "gp"}, "weight": 2},
+    {"key": "mess_kit",        "name": "Mess Kit",          "category": "gear", "cost": {"amount": 2, "unit": "sp"}, "weight": 1},
+    {"key": "mirror_steel",    "name": "Steel Mirror",      "category": "gear", "cost": {"amount": 5, "unit": "gp"}, "weight": 0.5},
+    {"key": "oil_flask",       "name": "Oil (flask)",       "category": "consumable", "cost": {"amount": 1, "unit": "sp"}, "weight": 1},
+    {"key": "piton",           "name": "Piton",             "category": "gear", "cost": {"amount": 5, "unit": "cp"}, "weight": 0.25},
+    {"key": "rations_1",       "name": "Rations (1 day)",   "category": "consumable", "cost": {"amount": 5, "unit": "sp"}, "weight": 2},
+    {"key": "rope_hempen_50",  "name": "Rope, Hempen (50 ft)","category": "gear", "cost": {"amount": 1, "unit": "gp"}, "weight": 10},
+    {"key": "rope_silk_50",    "name": "Rope, Silk (50 ft)","category": "gear", "cost": {"amount": 10,"unit": "gp"}, "weight": 5},
+    {"key": "tent_two_person", "name": "Tent, Two-Person",  "category": "gear", "cost": {"amount": 2, "unit": "gp"}, "weight": 20},
+    {"key": "tinderbox",       "name": "Tinderbox",         "category": "gear", "cost": {"amount": 5, "unit": "sp"}, "weight": 1},
+    {"key": "torch",           "name": "Torch",             "category": "gear", "cost": {"amount": 1, "unit": "cp"}, "weight": 1},
+    {"key": "waterskin",       "name": "Waterskin",         "category": "gear", "cost": {"amount": 2, "unit": "sp"}, "weight": 5},
+    {"key": "healers_kit",     "name": "Healer's Kit",      "category": "consumable", "cost": {"amount": 5, "unit": "gp"}, "weight": 3},
+    {"key": "potion_of_healing","name": "Potion of Healing","category": "consumable", "cost": {"amount": 50,"unit": "gp"}, "weight": 0.5},
+
+    {"key": "holy_symbol_amulet","name": "Holy Symbol (Amulet)","category": "focus", "cost": {"amount": 5,"unit":"gp"}, "weight": 1, "focus_for": ["divine"]},
+    {"key": "holy_symbol_emblem","name": "Holy Symbol (Emblem)","category": "focus", "cost": {"amount": 5,"unit":"gp"}, "weight": 0, "focus_for": ["divine"]},
+    {"key": "arcane_focus_orb",  "name": "Arcane Focus (Orb)",  "category": "focus", "cost": {"amount": 20,"unit":"gp"}, "weight": 3, "focus_for": ["arcane"]},
+    {"key": "arcane_focus_wand", "name": "Arcane Focus (Wand)", "category": "focus", "cost": {"amount": 10,"unit":"gp"}, "weight": 1, "focus_for": ["arcane"]},
+    {"key": "arcane_focus_staff","name": "Arcane Focus (Staff)","category": "focus", "cost": {"amount": 5, "unit":"gp"}, "weight": 4, "focus_for": ["arcane"]},
+    {"key": "druidic_focus_sprig","name": "Druidic Focus (Sprig of Mistletoe)","category": "focus","cost": {"amount":1,"unit":"gp"},"weight":0,"focus_for":["primal"]},
+    {"key": "component_pouch",   "name": "Component Pouch",     "category": "focus", "cost": {"amount": 25,"unit":"gp"}, "weight": 2, "focus_for": ["arcane"]},
+    {"key": "spellbook",         "name": "Spellbook",           "category": "gear",  "cost": {"amount": 50,"unit":"gp"}, "weight": 3},
+
+    {"key": "burglars_pack",   "name": "Burglar's Pack",   "category": "pack", "cost": {"amount": 16, "unit": "gp"}, "weight": 47, "contents": [
+      {"ref": "backpack", "qty": 1}, {"ref": "crowbar","qty":1}, {"ref":"hammer","qty":1}, {"ref":"piton","qty":10}, {"ref":"torch","qty":10}, {"ref":"tinderbox","qty":1}, {"ref":"rations_1","qty":5}, {"ref":"waterskin","qty":1}, {"ref":"rope_hempen_50","qty":1}
+    ]},
+    {"key": "diplomats_pack",  "name": "Diplomat's Pack",  "category": "pack", "cost": {"amount": 39, "unit": "gp"}, "weight": 39, "contents": [
+      {"ref": "backpack", "qty": 1}, {"ref":"oil_flask","qty":2}, {"ref":"rations_1","qty":5}
+    ]},
+    {"key": "dungeoneers_pack","name": "Dungeoneer's Pack","category": "pack", "cost": {"amount": 12, "unit": "gp"}, "weight": 61.5, "contents": [
+      {"ref": "backpack", "qty": 1}, {"ref":"crowbar","qty":1}, {"ref":"hammer","qty":1}, {"ref":"piton","qty":10}, {"ref":"torch","qty":10}, {"ref":"tinderbox","qty":1}, {"ref":"rations_1","qty":10}, {"ref":"waterskin","qty":1}, {"ref":"rope_hempen_50","qty":1}
+    ]},
+    {"key": "entertainers_pack","name": "Entertainer's Pack","category": "pack", "cost": {"amount": 40, "unit": "gp"}, "weight": 38, "contents": [
+      {"ref": "backpack", "qty": 1}, {"ref":"bedroll","qty":1}, {"ref":"candle","qty":5}, {"ref":"rations_1","qty":5}, {"ref":"waterskin","qty":1}
+    ]},
+    {"key": "explorers_pack",  "name": "Explorer's Pack",  "category": "pack", "cost": {"amount": 10, "unit": "gp"}, "weight": 59, "contents": [
+      {"ref": "backpack", "qty": 1}, {"ref":"bedroll","qty":1}, {"ref":"mess_kit","qty":1}, {"ref":"tinderbox","qty":1}, {"ref":"torch","qty":10}, {"ref":"rations_1","qty":10}, {"ref":"waterskin","qty":1}, {"ref":"rope_hempen_50","qty":1}
+    ]},
+    {"key": "priests_pack",    "name": "Priest's Pack",    "category": "pack", "cost": {"amount": 19, "unit": "gp"}, "weight": 24, "contents": [
+      {"ref": "backpack", "qty": 1}, {"ref":"blanket","qty":1}, {"ref":"candle","qty":10}, {"ref":"tinderbox","qty":1}, {"ref":"rations_1","qty":2}, {"ref":"waterskin","qty":1}
+    ]},
+    {"key": "scholars_pack",   "name": "Scholar's Pack",   "category": "pack", "cost": {"amount": 40, "unit": "gp"}, "weight": 10, "contents": [
+      {"ref": "backpack", "qty": 1}
+    ]}
+  ]
+}
+

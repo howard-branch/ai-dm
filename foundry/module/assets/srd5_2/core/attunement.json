@@ -1,0 +1,13 @@
+{
+  "_doc": "SRD 5.2.1 magic-item attunement rules. A creature can be attuned to at most three magic items at a time; attunement requires a short rest spent focusing on the item.",
+  "max_attuned": 3,
+  "short_rest_to_attune_min": 60,
+  "ends_when": [
+    "creature no longer satisfies the item's requirement",
+    "more than 100 ft from the item for 24 hours",
+    "creature dies",
+    "another creature attunes to the item",
+    "voluntarily ended at end of a short rest"
+  ]
+}
+

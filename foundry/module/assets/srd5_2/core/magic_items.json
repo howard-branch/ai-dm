@@ -1,0 +1,181 @@
+{
+  "schema_version": 1,
+  "rarities": [
+    "common",
+    "uncommon",
+    "rare",
+    "very_rare",
+    "legendary",
+    "artifact"
+  ],
+  "categories": [
+    "weapon",
+    "armor",
+    "shield",
+    "wondrous",
+    "ring",
+    "rod",
+    "staff",
+    "wand",
+    "potion",
+    "scroll"
+  ],
+  "items": [
+    {
+      "key": "potion_of_healing",
+      "name": "Potion of Healing",
+      "category": "potion",
+      "rarity": "common",
+      "requires_attunement": false,
+      "consumable": true,
+      "weight": 0.5,
+      "cost": {"amount": 50, "unit": "gp"},
+      "properties": ["heal:2d4+2"],
+      "description": "When you drink this potion, you regain 2d4 + 2 hit points."
+    },
+    {
+      "key": "potion_of_greater_healing",
+      "name": "Potion of Greater Healing",
+      "category": "potion",
+      "rarity": "uncommon",
+      "requires_attunement": false,
+      "consumable": true,
+      "weight": 0.5,
+      "properties": ["heal:4d4+4"]
+    },
+    {
+      "key": "weapon_plus_1",
+      "name": "+1 Weapon",
+      "category": "weapon",
+      "rarity": "uncommon",
+      "requires_attunement": false,
+      "consumable": false,
+      "weapon_bonus": 1,
+      "base_item_required": true,
+      "properties": ["overcomes:nonmagical_weapon_resistance"]
+    },
+    {
+      "key": "weapon_plus_2",
+      "name": "+2 Weapon",
+      "category": "weapon",
+      "rarity": "rare",
+      "requires_attunement": false,
+      "weapon_bonus": 2,
+      "base_item_required": true,
+      "properties": ["overcomes:nonmagical_weapon_resistance"]
+    },
+    {
+      "key": "weapon_plus_3",
+      "name": "+3 Weapon",
+      "category": "weapon",
+      "rarity": "very_rare",
+      "requires_attunement": false,
+      "weapon_bonus": 3,
+      "base_item_required": true,
+      "properties": ["overcomes:nonmagical_weapon_resistance"]
+    },
+    {
+      "key": "armor_plus_1",
+      "name": "+1 Armor",
+      "category": "armor",
+      "rarity": "rare",
+      "requires_attunement": false,
+      "armor_bonus": 1,
+      "base_item_required": true
+    },
+    {
+      "key": "armor_plus_2",
+      "name": "+2 Armor",
+      "category": "armor",
+      "rarity": "very_rare",
+      "requires_attunement": false,
+      "armor_bonus": 2,
+      "base_item_required": true
+    },
+    {
+      "key": "shield_plus_1",
+      "name": "+1 Shield",
+      "category": "shield",
+      "rarity": "uncommon",
+      "requires_attunement": false,
+      "armor_bonus": 1,
+      "base_item": "shield"
+    },
+    {
+      "key": "ring_of_protection",
+      "name": "Ring of Protection",
+      "category": "ring",
+      "rarity": "rare",
+      "requires_attunement": true,
+      "armor_bonus": 1,
+      "save_bonus": 1,
+      "weight": 0.0,
+      "properties": ["passive_ac_bonus:1", "passive_save_bonus:1"]
+    },
+    {
+      "key": "cloak_of_protection",
+      "name": "Cloak of Protection",
+      "category": "wondrous",
+      "rarity": "uncommon",
+      "requires_attunement": true,
+      "armor_bonus": 1,
+      "save_bonus": 1,
+      "weight": 1.0,
+      "properties": ["passive_ac_bonus:1", "passive_save_bonus:1"]
+    },
+    {
+      "key": "bag_of_holding",
+      "name": "Bag of Holding",
+      "category": "wondrous",
+      "rarity": "uncommon",
+      "requires_attunement": false,
+      "weight": 15.0,
+      "container_capacity_lb": 500.0,
+      "properties": ["extradimensional_storage"]
+    },
+    {
+      "key": "wand_of_magic_missiles",
+      "name": "Wand of Magic Missiles",
+      "category": "wand",
+      "rarity": "uncommon",
+      "requires_attunement": false,
+      "max_charges": 7,
+      "recharge": {"per": "dawn", "dice": "1d6+1", "destroy_on_zero_dc": 1},
+      "weight": 1.0,
+      "properties": ["cast:magic_missile@1", "expended_charges_for_level:cast_level"]
+    },
+    {
+      "key": "staff_of_healing",
+      "name": "Staff of Healing",
+      "category": "staff",
+      "rarity": "rare",
+      "requires_attunement": true,
+      "attunement_classes": ["bard", "cleric", "druid"],
+      "max_charges": 10,
+      "recharge": {"per": "dawn", "dice": "1d6+4", "destroy_on_zero_dc": 1},
+      "weapon_bonus": 0,
+      "weight": 4.0,
+      "properties": ["cast:cure_wounds@1+", "cast:lesser_restoration@2", "cast:mass_cure_wounds@5"]
+    },
+    {
+      "key": "boots_of_speed",
+      "name": "Boots of Speed",
+      "category": "wondrous",
+      "rarity": "rare",
+      "requires_attunement": true,
+      "weight": 1.0,
+      "properties": ["bonus_action:double_speed_10_rounds_per_day"]
+    },
+    {
+      "key": "scroll_of_fireball",
+      "name": "Spell Scroll (Fireball)",
+      "category": "scroll",
+      "rarity": "rare",
+      "requires_attunement": false,
+      "consumable": true,
+      "weight": 0.0,
+      "properties": ["cast:fireball@3"]
+    }
+  ]
+}
+

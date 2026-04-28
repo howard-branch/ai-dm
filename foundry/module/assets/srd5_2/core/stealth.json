@@ -1,0 +1,10 @@
+{
+  "hide_action_dc": "passive_perception",
+  "break_triggers": ["attack", "cast_spell", "speak_loud", "leave_cover"],
+  "invisible_grants": {
+    "attacker_advantage": true,
+    "target_disadvantage": true
+  },
+  "unseen_attacker_advantage": true
+}
+

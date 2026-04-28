@@ -1,0 +1,14 @@
+{
+  "short_rest": {
+    "duration_min": 60,
+    "hit_dice_spend": true,
+    "recovers": ["short_resources"]
+  },
+  "long_rest": {
+    "duration_hr": 8,
+    "hit_dice_recovered": "half_max_min_1",
+    "recovers": ["hp_full", "short_resources", "long_resources", "spell_slots", "exhaustion_minus_1"],
+    "max_per_day": 1
+  }
+}
+

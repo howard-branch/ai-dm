@@ -1,0 +1,6 @@
+{
+  "phases": ["start_of_turn", "action", "movement", "bonus_action", "end_of_turn"],
+  "reaction_resets_at": "start_of_turn",
+  "free_object_interactions_per_turn": 1
+}
+

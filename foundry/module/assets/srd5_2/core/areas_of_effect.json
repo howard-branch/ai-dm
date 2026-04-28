@@ -1,0 +1,10 @@
+{
+  "shapes": [
+    {"key": "sphere", "origin": "point"},
+    {"key": "cube", "origin": "point"},
+    {"key": "cone", "origin": "caster"},
+    {"key": "line", "origin": "caster", "width_ft": 5},
+    {"key": "cylinder", "origin": "point"}
+  ]
+}
+

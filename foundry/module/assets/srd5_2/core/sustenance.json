@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "notes": "SRD food/water requirements + starvation/dehydration tracks.",
+  "rations_per_day_lb_by_size": {"tiny": 0.25, "small": 1, "medium": 1, "large": 4, "huge": 16, "gargantuan": 64},
+  "water_per_day_gal_by_size":  {"tiny": 0.25, "small": 1, "medium": 1, "large": 4, "huge": 16, "gargantuan": 64},
+  "starvation": {
+    "min_grace_days": 1,
+    "days_grace_per_con_mod": 1,
+    "exhaustion_per_day_after": 1
+  },
+  "dehydration": {
+    "hot_climate_doubles": true,
+    "save_ability": "con",
+    "save_dc_base": 15,
+    "save_dc_per_prev_failed_day": 5,
+    "exhaustion_on_fail": 1
+  },
+  "rest": {
+    "short_min_minutes": 60,
+    "long_min_hours": 8,
+    "long_max_per_24h": 1,
+    "interrupt_long_strenuous_minutes": 60,
+    "interrupt_short_combat_rounds": 1
+  }
+}
+

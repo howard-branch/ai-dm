@@ -1,0 +1,11 @@
+{
+  "default_speed_ft": 30,
+  "modes": ["walk", "fly", "swim", "climb", "burrow"],
+  "difficult_terrain_factor": 2,
+  "diagonal": "5-5-5",
+  "standing_costs_half_speed": true,
+  "prone_crawl_factor": 2,
+  "climbing_factor": 2,
+  "swimming_factor": 2
+}
+

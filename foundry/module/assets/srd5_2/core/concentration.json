@@ -1,0 +1,8 @@
+{
+  "save": "con",
+  "min_dc": 10,
+  "dc_formula": "max(10, floor(damage/2))",
+  "broken_by": ["incapacitated", "killed", "second_concentration"],
+  "auto_drop_at_zero_hp": true
+}
+

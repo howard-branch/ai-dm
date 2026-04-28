@@ -1,0 +1,15 @@
+{
+  "grapple": {
+    "attacker_skill": "athletics",
+    "defender_skills": ["athletics", "acrobatics"],
+    "max_size_diff": 1,
+    "escape": "action"
+  },
+  "shove": {
+    "attacker_skill": "athletics",
+    "defender_skills": ["athletics", "acrobatics"],
+    "max_size_diff": 1,
+    "options": ["push_5ft", "prone"]
+  }
+}
+

@@ -1,0 +1,21 @@
+{
+  "economy_keys": ["action", "bonus_action", "reaction", "free"],
+  "standard_actions": [
+    {"key": "attack", "economy": "action"},
+    {"key": "cast_spell", "economy": "action"},
+    {"key": "dash", "economy": "action"},
+    {"key": "disengage", "economy": "action"},
+    {"key": "dodge", "economy": "action"},
+    {"key": "help", "economy": "action"},
+    {"key": "hide", "economy": "action"},
+    {"key": "ready", "economy": "action"},
+    {"key": "search", "economy": "action"},
+    {"key": "use_item", "economy": "action"},
+    {"key": "grapple", "economy": "action"},
+    {"key": "shove", "economy": "action"},
+    {"key": "two_weapon_attack", "economy": "bonus_action"},
+    {"key": "opportunity_attack", "economy": "reaction"},
+    {"key": "end_turn", "economy": "free"}
+  ]
+}
+
