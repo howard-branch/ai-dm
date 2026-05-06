@@ -387,10 +387,12 @@ def build_opening_envelope(
 
     # Append the chapter's primary goal so the player knows where they
     # are *trying to get to* — without this the opener establishes
-    # mood but not direction.
+    # mood but not direction. Plain prose: the chat renderer escapes
+    # HTML, so any markdown like ``**bold**`` would show up as literal
+    # asterisks instead of being styled.
     goal = find_chapter_goal(pack)
     if goal:
-        narration = f"{narration}\n\n**Your goal:** {goal}"
+        narration = f"{narration}\n\nYour goal: {goal}"
 
     envelope: dict[str, Any] = {
         "actor_id": actor_id,

@@ -203,6 +203,20 @@ class BatchExecutor:
             snap = self.inverter.snapshot(cmd, scope_key=scope_key)
             snapshots.append(snap)
 
+            # Surface the actual payload key fields so the terminal
+            # shows *what* id is being sent over the wire (most
+            # apply_damage failures are a mismatch between the
+            # CombatantState id and the Foundry actor id/name).
+            _key_fields = {
+                k: getattr(cmd, k)
+                for k in ("actor_id", "token_id", "scene_id", "target_id", "amount")
+                if hasattr(cmd, k) and getattr(cmd, k) is not None
+            }
+            logger.info(
+                "batch_executor: submitting %s scope=%s %s",
+                cmd.type, scope_key, _key_fields,
+            )
+
             try:
                 response = self.queue.submit(
                     cmd.model_dump(),
@@ -231,7 +245,10 @@ class BatchExecutor:
                 outcome.results.append(
                     StepResult(command=cmd, response=None, ok=False, error=str(exc))
                 )
-                logger.warning("batch step failed: %s — %s", cmd.type, exc)
+                logger.warning(
+                    "batch step failed: %s %s — %s",
+                    cmd.type, _key_fields, exc,
+                )
                 if atomic:
                     self._rollback(successes, outcome)
                 return outcome
@@ -242,6 +259,11 @@ class BatchExecutor:
             )
             successes.append((cmd, snap, payload_result))
             self._update_registry_after_success(cmd, payload_result)
+            logger.info(
+                "batch_executor: %s OK → %s",
+                cmd.type,
+                payload_result if isinstance(payload_result, dict) else "(no result body)",
+            )
 
         return outcome
 

@@ -8,8 +8,28 @@ formatters:
 handlers:
   console:
     class: logging.StreamHandler
-    level: INFO
+    # DEBUG so the per-logger overrides below (combat, turn_manager,
+    # npc_turn_driver, structured_intent_dispatcher) actually print
+    # their DEBUG lines. Other loggers stay at INFO via the root.
+    level: DEBUG
     formatter: standard
+
+loggers:
+  # Verbose tracing for the player-attack → end-turn → NPC-turn pipeline.
+  # All lines emitted by this chain are tagged with the "npc_turn:" prefix
+  # so you can isolate them with: grep 'npc_turn:'
+  ai_dm.combat:
+    level: DEBUG
+    propagate: true
+  ai_dm.orchestration.turn_manager:
+    level: DEBUG
+    propagate: true
+  ai_dm.orchestration.npc_turn_driver:
+    level: DEBUG
+    propagate: true
+  ai_dm.orchestration.structured_intent_dispatcher:
+    level: DEBUG
+    propagate: true
 
 root:
   level: INFO

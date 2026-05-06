@@ -30,6 +30,7 @@ foundry:
       - system.skills.
       - system.spells.
       - system.traits.
+      - system.currency.
   batch:
     atomic_default: true
     timeout_s: 30
@@ -50,7 +51,7 @@ persistence:
 # so authored material stays outside this repository.
 campaigns:
   root: ~/dnd/campaigns
-  active: ArmyOfTheDamned
+  active: orc_room
   state_root: data/campaigns
 
 memory:
@@ -78,6 +79,20 @@ triggers:
 
 planner:
   enabled: true
+
+# Phase 4: interactive roll prompts.
+# When enabled, any ``dice_requests`` produced by the AI narrator (or
+# emitted directly via the ``roll.requested`` bus event) are surfaced
+# in Foundry as a clickable chat card. Player clicks the button →
+# Foundry rolls (with Dice So Nice if installed) → result returns to
+# Python and resumes the narration loop.
+#
+# DM-side rolls always go through the same audit log
+# (``data/campaigns/<slug>/logs/rolls.jsonl``) regardless of visibility.
+rolls:
+  enabled: true
+  timeout_s: 30
+  on_timeout: auto_roll   # auto_roll | cancel | gm_prompt
 
 foundry_inbound:
   enabled: true

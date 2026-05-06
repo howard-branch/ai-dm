@@ -37,11 +37,13 @@ class StructuredIntentDispatcher:
         intent_router=None,
         combat=None,
         client=None,
+        turn_manager=None,
     ) -> None:
         self.event_bus = event_bus
         self.intent_router = intent_router
         self.combat = combat
         self.client = client
+        self.turn_manager = turn_manager
         self._unsubscribe = None
 
     def start(self) -> None:
@@ -64,6 +66,11 @@ class StructuredIntentDispatcher:
     def _on_intent(self, payload: dict[str, Any]) -> None:
         verb = payload.get("type")
         actor_id = payload.get("actor_id")
+        target_id = payload.get("target_id")
+        logger.info(
+            "npc_turn: player_intent verb=%s actor=%s target=%s payload_keys=%s",
+            verb, actor_id, target_id, sorted(payload.keys()),
+        )
         if not verb:
             logger.warning("player_intent missing type: %s", payload)
             return
@@ -108,6 +115,8 @@ class StructuredIntentDispatcher:
             ctx["attack_modifier"] = payload["attack_modifier"]
         if payload.get("damage_dice"):
             ctx["damage_dice"] = payload["damage_dice"]
+        if payload.get("two_handed") is not None:
+            ctx["two_handed"] = bool(payload["two_handed"])
 
         try:
             envelope = self.intent_router.handle(intent, ctx=ctx)
@@ -118,6 +127,15 @@ class StructuredIntentDispatcher:
         narration = self._summarise(envelope)
         if narration:
             self._push_narration(payload.get("actor_id"), payload.get("user_id"), narration)
+        # IMPORTANT: resolving an attack/skill/etc. via the intent
+        # router does NOT advance combat. The spotlight stays on the
+        # player until the End Turn macro fires. If you wonder why
+        # Grokk "doesn't attack back" after you hit him, this is why.
+        logger.info(
+            "npc_turn: player intent %s resolved → narration=%r; "
+            "turn NOT auto-ended (press End Turn to give NPCs a turn)",
+            verb, narration,
+        )
 
     def _handle_combat(self, verb: str, payload: dict[str, Any]) -> None:
         if self.combat is None or self.combat.state is None:
@@ -129,8 +147,39 @@ class StructuredIntentDispatcher:
             return
         try:
             if verb == "end_turn":
+                logger.info(
+                    "npc_turn: end_turn submitted by actor=%s; "
+                    "turn_manager=%s",
+                    payload.get("actor_id"),
+                    type(self.turn_manager).__name__ if self.turn_manager else None,
+                )
                 self.combat.submit_action(kind="end_turn", payload=payload)
-                next_actor = self.combat.end_turn()
+                if self.turn_manager is not None:
+                    # Drives end_turn → (begin_round on wrap) →
+                    # request_action so the spotlight actually
+                    # advances and the NPC driver gets to act.
+                    self.turn_manager.next_turn()
+                    s = self.combat.state
+                    next_actor = (
+                        s.participants[s.current_index]
+                        if s is not None and 0 <= s.current_index < len(s.participants)
+                        else None
+                    )
+                else:
+                    next_actor = self.combat.end_turn()
+                if next_actor is not None:
+                    logger.info(
+                        "npc_turn: spotlight now on actor=%s name=%s "
+                        "controller=%s team=%s hp=%s/%s",
+                        getattr(next_actor, "actor_id", None),
+                        getattr(next_actor, "name", None),
+                        getattr(next_actor, "controller", None),
+                        getattr(next_actor, "team", None),
+                        getattr(next_actor, "hp", None),
+                        getattr(next_actor, "max_hp", None),
+                    )
+                else:
+                    logger.info("npc_turn: end_turn → round complete")
                 msg = (
                     f"[end turn → next: {next_actor.name}]"
                     if next_actor is not None
@@ -140,7 +189,7 @@ class StructuredIntentDispatcher:
                 entry = self.combat.submit_action(kind=verb, payload=payload)
                 msg = f"[{entry.actor_id} takes the {verb} action]"
         except Exception as exc:  # noqa: BLE001
-            logger.warning("combat verb %s failed: %s", verb, exc)
+            logger.exception("combat verb %s failed: %s", verb, exc)
             msg = f"[{verb} failed: {exc}]"
 
         self._push_narration(payload.get("actor_id"), payload.get("user_id"), msg)
@@ -154,20 +203,29 @@ class StructuredIntentDispatcher:
         if res is None:
             return ""
         d = res.to_dict()
-        if d.get("type") == "attack":
-            outcome = "hit" if d.get("hit") else "miss"
-            dmg = d.get("damage")
+        kind = d.get("type")
+        details = d.get("details") or {}
+        if kind == "attack":
+            atk = details.get("attack") or {}
+            dmg = details.get("damage") or {}
+            outcome = "hit" if d.get("success") else "miss"
             tgt = d.get("target_id") or "target"
-            return f"[Attack vs {tgt}: {d.get('attack_total', '?')} → {outcome}" + (
-                f" for {dmg}" if dmg else ""
-            ) + "]"
-        if d.get("type") == "skill_check":
+            roll_total = atk.get("total", "?")
+            mod = atk.get("attack_modifier")
+            ac = atk.get("target_ac")
+            mod_str = f" ({mod:+d} vs AC {ac})" if isinstance(mod, int) and ac is not None else ""
+            dmg_total = dmg.get("total") if isinstance(dmg, dict) else None
+            tail = f" for {dmg_total}" if d.get("success") and dmg_total else ""
+            crit = " CRIT" if atk.get("crit") else ""
+            return f"[Attack vs {tgt}: {roll_total}{mod_str} → {outcome}{tail}{crit}]"
+        if kind == "skill_check":
             outcome = "success" if d.get("success") else "failure"
+            check = details.get("check") or details
             return (
-                f"[{d.get('skill', 'skill')} check: {d.get('total', '?')}"
-                f" vs DC {d.get('dc', '?')} → {outcome}]"
+                f"[{check.get('skill') or d.get('skill') or 'skill'} check: "
+                f"{check.get('total', '?')} vs DC {check.get('dc', '?')} → {outcome}]"
             )
-        return f"[{d.get('type', 'action')} resolved]"
+        return f"[{kind or 'action'} resolved]"
 
     def _push_narration(self, actor_id, user_id, narration: str) -> None:
         if self.client is None or not narration:

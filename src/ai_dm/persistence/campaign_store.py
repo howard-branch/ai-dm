@@ -25,6 +25,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from ai_dm.foundry.registry import FoundryRegistry
 from ai_dm.game.combat_machine import CombatMachine
 from ai_dm.game.location_service import LocationService
+from ai_dm.game.party_state import PartyState
 from ai_dm.memory.npc_memory import NPCMemoryStore
 from ai_dm.memory.relationships import RelationshipMatrix
 from ai_dm.persistence.atomic_writer import atomic_write_json
@@ -34,7 +35,7 @@ from ai_dm.utils.time import now_iso
 
 logger = logging.getLogger("ai_dm.persistence.campaign")
 
-SAVE_SCHEMA_VERSION = 3
+SAVE_SCHEMA_VERSION = 4
 SAVE_FILENAME = "campaign_state.json"
 
 
@@ -57,6 +58,8 @@ class CampaignSnapshot(BaseModel):
     foundry_journals: dict = Field(default_factory=dict)
     actor_state: dict = Field(default_factory=dict)
     clock: dict = Field(default_factory=dict)
+    # Phase 5 (XP / party state).
+    party: dict = Field(default_factory=dict)
 
 
 @dataclass
@@ -76,6 +79,10 @@ class CampaignStore:
     foundry_journals: dict[str, Any] | None = None
     actor_state: dict[str, Any] | None = None
     clock: Any = None  # ai_dm.game.clock.Clock — typed loosely to avoid an import cycle
+    # Phase 5: party / XP. Mutated in place so XPCollector and
+    # InteractionEffectsApplier (which hold references) keep seeing
+    # the live snapshot after a restore.
+    party_state: PartyState | None = None
 
     def __post_init__(self) -> None:
         self.base = Path(self.base)
@@ -117,6 +124,7 @@ class CampaignStore:
             foundry_journals=dict(self.foundry_journals or {}),
             actor_state=dict(self.actor_state or {}),
             clock=self.clock.snapshot() if self.clock else {},
+            party=self.party_state.model_dump() if self.party_state else {},
         )
 
     def save(self) -> Path:
@@ -169,6 +177,16 @@ class CampaignStore:
             self.actor_state.update(snap.actor_state or {})
         if self.clock is not None and snap.clock:
             self.clock.restore(snap.clock)
+        if self.party_state is not None and snap.party:
+            # Mutate the existing instance in place so any subscriber
+            # holding the original reference (XPCollector, …) keeps
+            # the live state.
+            restored = PartyState.model_validate(snap.party)
+            self.party_state.members = list(restored.members)
+            self.party_state.xp_pool = dict(restored.xp_pool)
+            self.party_state.levels = dict(restored.levels)
+            self.party_state.pending_xp = int(restored.pending_xp)
+            self.party_state.xp_log = list(restored.xp_log)
 
     # ------------------------------------------------------------------ #
 
@@ -212,6 +230,13 @@ class CampaignStore:
                 "actor_state": {},
             }
             version = 3
+        if version == 3:
+            payload = {
+                **payload,
+                "schema_version": 4,
+                "party": {},
+            }
+            version = 4
         if version != SAVE_SCHEMA_VERSION:
             raise ValueError(f"unsupported save schema_version: {version}")
         return payload

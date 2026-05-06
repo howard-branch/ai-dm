@@ -203,6 +203,7 @@ class PlayerInputDispatcher:
         user_id = payload.get("user_id")
         user_name = payload.get("user_name")
         scene_id = payload.get("scene_id")
+        origin = payload.get("origin")
 
         if self.director is None:
             logger.warning("player_input received before Director was wired")
@@ -238,7 +239,8 @@ class PlayerInputDispatcher:
                     director_started = time.monotonic()
                     logger.info("TURN → director.handle_player_input()")
                     result = self.director.handle_player_input(
-                        text, scene_id=scene_id, actor_id=actor_id
+                        text, scene_id=scene_id, actor_id=actor_id,
+                        origin=origin,
                     )
                     logger.info(
                         "TURN ← director returned in %.2fs",

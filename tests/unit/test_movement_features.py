@@ -63,6 +63,58 @@ def test_parser_plain_move_unaffected():
     assert out.direction is None
 
 
+def test_parser_partial_move_direction_before_distance():
+    """Reverse phrasing: ``move <direction> <distance> ft``.
+
+    Regression: previously fell through to ``_MOVE_RE`` and stuffed
+    "north 10 feet" into ``target_anchor``, which then got shipped to
+    Foundry as a token name and failed with "target not found on
+    scene".
+    """
+    p = IntentParser()
+    out = p.parse("move north 10 feet")
+    assert out.type == "move"
+    assert out.target_anchor is None
+    assert out.distance_ft == 10
+    assert out.direction == "north"
+
+
+def test_router_normalises_directional_target_anchor():
+    """LLM/structured intents that put "north 10 ft" into
+    ``target_anchor`` must be lifted into ``direction``/``distance_ft``
+    by the router before dispatch — otherwise Foundry rejects the move.
+    """
+    from ai_dm.ai.intent_router import _normalise_directional_target
+
+    intent = PlayerIntent(
+        type="move", verb="move", actor_id="pc",
+        target_anchor="north 10 feet", raw_text="…",
+    )
+    out = _normalise_directional_target(intent)
+    assert out.target_anchor is None
+    assert out.direction == "north"
+    assert out.distance_ft == 10
+
+    # And the reversed shape: "10 ft north".
+    intent2 = PlayerIntent(
+        type="move", verb="move", actor_id="pc",
+        target_anchor="10 ft north", raw_text="…",
+    )
+    out2 = _normalise_directional_target(intent2)
+    assert out2.target_anchor is None
+    assert out2.direction == "north"
+    assert out2.distance_ft == 10
+
+    # Non-directional anchors are left alone.
+    intent3 = PlayerIntent(
+        type="move", verb="move", actor_id="pc",
+        target_anchor="altar", raw_text="…",
+    )
+    out3 = _normalise_directional_target(intent3)
+    assert out3.target_anchor == "altar"
+    assert out3.direction is None
+
+
 # ---------------------------------------------------------------------- #
 # LocationService geometry
 # ---------------------------------------------------------------------- #

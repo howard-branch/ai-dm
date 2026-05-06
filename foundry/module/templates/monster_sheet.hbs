@@ -1,0 +1,42 @@
+<section class="ai-dm-monster-sheet">
+    <header class="ai-dm-monster-header">
+        <img class="ai-dm-monster-portrait" src="{{img}}" alt="{{name}}" />
+        <div class="ai-dm-monster-title">
+            <h2 class="ai-dm-monster-name">{{name}}</h2>
+            <div class="ai-dm-monster-subtitle">
+                {{#if size}}<span class="tag">{{size}}</span>{{/if}}
+                {{#if creatureType}}<span class="tag">{{creatureType}}</span>{{else}}<span class="tag muted">unknown</span>{{/if}}
+                {{#if alignment}}<span class="tag muted">{{alignment}}</span>{{/if}}
+            </div>
+        </div>
+    </header>
+
+    <dl class="ai-dm-monster-stats">
+        <div class="row">
+            <dt>HP</dt>
+            <dd>
+                <div class="ai-dm-hp-bar" title="{{hp.value}} / {{hp.max}}">
+                    <span class="ai-dm-hp-fill" style="width: {{hp.percent}}%;"></span>
+                    <span class="ai-dm-hp-label">{{hp.value}} / {{hp.max}}</span>
+                </div>
+            </dd>
+        </div>
+        {{#if ac}}
+        <div class="row">
+            <dt>AC</dt>
+            <dd>{{ac}}</dd>
+        </div>
+        {{/if}}
+        {{#if cr}}
+        <div class="row">
+            <dt>CR</dt>
+            <dd>{{cr}}{{#if xp}} <span class="muted">({{xp}} XP)</span>{{/if}}</dd>
+        </div>
+        {{/if}}
+    </dl>
+
+    <footer class="ai-dm-monster-footer">
+        <button type="button" class="ai-dm-monster-close" data-action="close">Close</button>
+    </footer>
+</section>
+

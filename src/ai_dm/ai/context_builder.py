@@ -29,6 +29,7 @@ class PromptContextBuilder:
         character: dict | None = None,
         party: list[dict] | None = None,
         pack: CampaignPack | None = None,
+        combat=None,                          # ai_dm.game.combat_machine.CombatMachine
     ) -> None:
         self.state_store = state_store
         self.npc_memory = npc_memory
@@ -47,6 +48,11 @@ class PromptContextBuilder:
         # player aware of their options on every turn, not just the
         # opening narration.
         self.pack = pack
+        # Live combat machine — when an encounter is active we surface
+        # a compact ``combat`` block (round, current actor, HP/AC of
+        # every participant, the last few action-log entries) so the
+        # narrator describes the *fight* instead of generic ambience.
+        self.combat = combat
         # Last scene id we successfully built a brief for. Used as a
         # fall-back when a turn arrives with a scene_id that doesn't
         # resolve in the pack (e.g. Foundry's opaque id vs. our slug).
@@ -125,8 +131,68 @@ class PromptContextBuilder:
             except Exception:  # noqa: BLE001
                 pass
 
+        # Combat block — only present when an encounter is live. The
+        # narrator system prompt switches to fight-narration tone when
+        # ``in_combat`` is True (see prompts.py).
+        combat_block = self._build_combat_block()
+        if combat_block is not None:
+            context["combat"] = combat_block
+            context["in_combat"] = True
+
         context["player_input"] = player_input
         return context
+
+    # ------------------------------------------------------------------ #
+
+    def _build_combat_block(self) -> dict | None:
+        if self.combat is None:
+            return None
+        state = getattr(self.combat, "state", None)
+        if state is None:
+            return None
+        phase = getattr(state, "phase", None)
+        if phase in (None, "ended"):
+            return None
+        try:
+            participants = []
+            for p in state.participants:
+                participants.append({
+                    "actor_id": p.actor_id,
+                    "name": p.name,
+                    "team": getattr(p, "team", None),
+                    "controller": getattr(p, "controller", None),
+                    "hp": int(getattr(p, "hp", 0) or 0),
+                    "max_hp": int(getattr(p, "max_hp", 0) or 0),
+                    "ac": int(getattr(p, "ac", 0) or 0),
+                    "conditions": [
+                        getattr(c, "key", None) or str(c)
+                        for c in (getattr(p, "conditions", None) or [])
+                    ],
+                })
+            cur_idx = int(getattr(state, "current_index", 0) or 0)
+            cur_actor = (
+                state.participants[cur_idx].actor_id
+                if 0 <= cur_idx < len(state.participants)
+                else None
+            )
+            recent = []
+            for entry in (getattr(state, "log", None) or [])[-3:]:
+                recent.append({
+                    "round": getattr(entry, "round", None),
+                    "actor_id": getattr(entry, "actor_id", None),
+                    "kind": getattr(entry, "kind", None),
+                    "result": getattr(entry, "result", None),
+                })
+            return {
+                "encounter_id": state.encounter_id,
+                "phase": phase,
+                "round": int(getattr(state, "round", 0) or 0),
+                "current_actor_id": cur_actor,
+                "participants": participants,
+                "recent_log": recent,
+            }
+        except Exception:  # noqa: BLE001
+            return None
 
     # ------------------------------------------------------------------ #
 

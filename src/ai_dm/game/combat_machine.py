@@ -125,6 +125,14 @@ class CombatMachine:
         actor = s.participants[s.current_index]
         # Action economy + per-turn resources reset on the active actor.
         actor.start_of_turn()
+        logger.info(
+            "npc_turn: request_action → highlighting actor=%s name=%s "
+            "controller=%s team=%s hp=%s/%s round=%s idx=%s/%s",
+            actor.actor_id, getattr(actor, "name", None),
+            getattr(actor, "controller", None), getattr(actor, "team", None),
+            getattr(actor, "hp", None), getattr(actor, "max_hp", None),
+            s.round, s.current_index, len(s.participants),
+        )
         self._publish(
             "combat.actor_highlighted",
             {"actor_id": actor.actor_id, "round": s.round},
@@ -177,11 +185,30 @@ class CombatMachine:
             self._publish("combat.turn_ended", {
                 "actor_id": actor.actor_id, "round": s.round, **report,
             })
+        # Some callers (notably the PC-attack resolver) advance the
+        # turn without ever calling ``submit_action`` — e.g. when a
+        # player resolves an attack via chat and we just want to pass
+        # the spotlight. In that case we're still in
+        # ``awaiting_action`` and the direct hop to ``in_round`` is
+        # illegal; hop through ``resolving_action`` first so the
+        # state-machine invariants hold.
+        if s.phase == "awaiting_action":
+            self._transition("resolving_action")
         self._transition("in_round")
         s.current_index += 1
         if s.current_index >= len(s.participants):
+            logger.info(
+                "npc_turn: end_turn → end of round %s (idx wrapped past %d)",
+                s.round, len(s.participants),
+            )
             return None  # round complete
-        return s.participants[s.current_index]
+        nxt = s.participants[s.current_index]
+        logger.info(
+            "npc_turn: end_turn → idx=%d/%d next=%s controller=%s",
+            s.current_index, len(s.participants),
+            nxt.actor_id, getattr(nxt, "controller", None),
+        )
+        return nxt
 
     def end_encounter(self, reason: str = "ended") -> CombatState:
         s = self._require_state()
@@ -221,6 +248,10 @@ class CombatMachine:
         if target != s.phase:
             previous = s.phase
             s.phase = target
+            logger.debug(
+                "npc_turn: combat phase %s → %s round=%s idx=%s",
+                previous, target, s.round, s.current_index,
+            )
             self._publish(
                 "combat.phase_changed",
                 {"from": previous, "to": target, "round": s.round},
@@ -230,5 +261,5 @@ class CombatMachine:
         try:
             self.event_bus.publish(event, payload)
         except Exception as exc:  # noqa: BLE001
-            logger.warning("event publish failed for %s: %s", event, exc)
+            logger.exception("event publish failed for %s: %s", event, exc)
 

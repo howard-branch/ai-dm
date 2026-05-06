@@ -1,0 +1,23 @@
+{
+  "type": "event",
+  "event": "player_roll_resolved",
+  "payload": {
+    "request_id": "prq-example-perception-1",
+    "actor_id": "Sansa",
+    "roll_type": "skill",
+    "key": "perception",
+    "formula": "1d20+3",
+    "total": 17,
+    "modifier": 3,
+    "rolls": [14],
+    "kept": [14],
+    "advantage": "normal",
+    "crit": false,
+    "fumble": false,
+    "dc": 15,
+    "ac": null,
+    "success": true,
+    "elapsed_ms": 4280
+  }
+}
+

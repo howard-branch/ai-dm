@@ -1,3 +1,5 @@
+import { findTargetOnScene } from "./token_commands.js";
+
 // Resolve an actor by Foundry id OR by case-insensitive name. Lets
 // campaign manifests reference actors by stable human slugs.
 function resolveActor(actorIdOrName) {
@@ -132,9 +134,13 @@ export async function highlightObject(targetId) {
     throw new Error("No active scene on canvas");
   }
 
+  // 1. Direct id/name match against token placeables (existing fast path).
   let token = canvas.tokens?.placeables?.find((t) => t.id === targetId);
   if (!token) {
-    token = canvas.tokens?.placeables?.find((t) => t.name === targetId);
+    const want = String(targetId).toLowerCase();
+    token = canvas.tokens?.placeables?.find(
+      (t) => (t.name || "").toLowerCase() === want
+    );
   }
 
   if (token) {
@@ -143,13 +149,30 @@ export async function highlightObject(targetId) {
     return;
   }
 
+  // 2. Direct id/text match against journal notes.
   let note = canvas.notes?.placeables?.find((n) => n.id === targetId);
   if (!note) {
-    note = canvas.notes?.placeables?.find((n) => n.document?.text === targetId);
+    const want = String(targetId).toLowerCase();
+    note = canvas.notes?.placeables?.find(
+      (n) => (n.document?.text || "").toLowerCase() === want
+    );
   }
 
   if (note) {
     await canvas.animatePan({ x: note.center.x, y: note.center.y, scale: 1.2 });
+    return;
+  }
+
+  // 3. Fuzzy match across tokens / notes / drawings via the same
+  //    resolver moveActorTo uses, so verbal anchors like "altar" or
+  //    "the chapel doors" resolve to scene drawings/labels even when
+  //    no token of that name exists. Returns scene-document coords
+  //    (top-left + size); convert to a centre point for animatePan.
+  const hit = findTargetOnScene(canvas.scene, targetId);
+  if (hit) {
+    const cx = hit.x + ((hit.width || 1) * (canvas.scene.grid?.size || 100)) / 2;
+    const cy = hit.y + ((hit.height || 1) * (canvas.scene.grid?.size || 100)) / 2;
+    await canvas.animatePan({ x: cx, y: cy, scale: 1.2 });
     return;
   }
 

@@ -11,7 +11,9 @@ from ai_dm.foundry.validator import CommandValidator
 from ai_dm.game.location_service import LocationService
 from ai_dm.models.commands import (
     ActivateSceneCommand,
+    ApplyDamageCommand,
     GameCommand,
+    GiveItemCommand,
     HighlightObjectCommand,
     MoveActorToCommand,
     MoveTokenCommand,
@@ -157,6 +159,22 @@ class CommandRouter:
             if raw.type == "highlight_object":
                 return HighlightObjectCommand(
                     target_id=self._require(raw.target_id, "target_id"),
+                ).model_dump()
+
+            if raw.type == "give_item":
+                return GiveItemCommand(
+                    actor_id=self._require(raw.actor_id, "actor_id"),
+                    item_key=self._require(raw.item_key, "item_key"),
+                    qty=int(raw.qty or 1),
+                    container=raw.container,
+                ).model_dump()
+
+            if raw.type == "apply_damage":
+                return ApplyDamageCommand(
+                    actor_id=self._require(raw.actor_id, "actor_id"),
+                    amount=int(raw.amount or 0),
+                    damage_type=str(raw.damage_type or "untyped"),
+                    crit=bool(raw.crit or False),
                 ).model_dump()
 
             logger.warning("skipping unsupported command type: %s", raw.type)

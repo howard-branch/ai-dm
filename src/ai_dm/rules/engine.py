@@ -200,6 +200,7 @@ class RulesEngine:
         attack_modifier: int,
         advantage: str | None = None,
         is_within_5ft: bool = False,
+        preroll_d20: int | None = None,
     ) -> AttackResult:
         adv = self._advantage_for(attacker, target=target, override=advantage)
         eff_mod = int(attack_modifier) + _exh_d20_penalty(
@@ -210,6 +211,7 @@ class RulesEngine:
             attack_modifier=eff_mod,
             target_ac=target.ac,
             advantage=adv,
+            preroll_d20=preroll_d20,
         )
         # SRD 5.2.1: any hit from within 5 ft against a paralyzed or
         # unconscious target is a critical hit. Caller (CombatMachine)
@@ -281,7 +283,19 @@ class RulesEngine:
         if amount <= 0:
             return target.hp
         was_at_zero = target.hp == 0
+        hp_before = target.hp
         outcome = _apply_damage(target, int(amount), damage_type=damage_type)
+        logger.info(
+            "rules.apply_damage: target=%r (name=%r) amount=%d type=%s "
+            "hp %d → %d (dealt=%s, dropped_to_zero=%s, crit=%s)",
+            getattr(target, "actor_id", None),
+            getattr(target, "name", None),
+            int(amount), damage_type,
+            hp_before, target.hp,
+            getattr(outcome, "dealt", None),
+            getattr(outcome, "dropped_to_zero", None),
+            bool(crit),
+        )
         self._publish(
             "rules.damage_applied",
             {

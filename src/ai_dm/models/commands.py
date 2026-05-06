@@ -180,6 +180,38 @@ class CreateNoteCommand(BaseCommand):
     icon: str | None = None
 
 
+class GiveItemCommand(BaseCommand):
+    """Grant an item (by content-pack key) to an actor's inventory.
+
+    Emitted by :class:`ai_dm.orchestration.interaction_effects.InteractionEffectsApplier`
+    when an authored interaction's ``grants:`` list resolves on success.
+    The Foundry-side handler (``foundry/module/scripts/inventory.js``,
+    not yet implemented at the time of writing — a payload-example
+    stub lives at ``foundry/payload_examples/give_item.json``)
+    looks up ``item_key`` in the campaign content pack, clones the
+    Item document, and inserts ``qty`` copies under the actor.
+    """
+    type: Literal["give_item"] = "give_item"
+    actor_id: str
+    item_key: str
+    qty: int = 1
+    container: str | None = None
+
+
+class ApplyDamageCommand(BaseCommand):
+    """Apply HP loss to an actor in Foundry.
+
+    Mirrors :func:`ai_dm.rules.engine.RulesEngine.apply_damage` —
+    Python is authoritative on the new HP, and this command is the
+    projection so the Foundry sheet/token bar updates to match.
+    """
+    type: Literal["apply_damage"] = "apply_damage"
+    actor_id: str
+    amount: int
+    damage_type: str = "untyped"
+    crit: bool = False
+
+
 GameCommand = Union[
     MoveTokenCommand,
     MoveActorToCommand,
@@ -198,4 +230,6 @@ GameCommand = Union[
     CreateJournalCommand,
     UpdateJournalCommand,
     CreateNoteCommand,
+    GiveItemCommand,
+    ApplyDamageCommand,
 ]

@@ -753,6 +753,9 @@ class CombatantState(BaseModel):
     # --- SRD ability mods + saves (derived; cached for fast access) - #
     ability_mods: dict[str, int] = Field(default_factory=dict)
     saving_throws: dict[str, int] = Field(default_factory=dict)
+    # Class- (for PCs) or CR- (for NPCs) derived proficiency bonus.
+    # Default of +2 matches level 1 / CR ≤ 4 per SRD.
+    proficiency_bonus: int = 2
 
     # --- resources -------------------------------------------------- #
     resources: dict[str, ResourceUse] = Field(default_factory=dict)
@@ -1137,6 +1140,7 @@ class CombatantState(BaseModel):
             }),
             ability_mods=dict(sheet.get("ability_mods") or {}),
             saving_throws=dict(sheet.get("saving_throws") or {}),
+            proficiency_bonus=int(sheet.get("proficiency_bonus") or 2),
             spell_slots=_slots_from_sheet(spells.get("slots")),
             cantrips=_spell_ids(spells.get("cantrips_known")),
             known_spells=_spell_ids(spells.get("known")),
@@ -1251,6 +1255,10 @@ class CombatantState(BaseModel):
             stat_block_key=block.get("stat_block_key") or block.get("key"),
             saving_throws=dict(block.get("saving_throws") or {}),
             ability_mods=dict(block.get("ability_mods") or {}),
+            proficiency_bonus=int(
+                block.get("proficiency_bonus")
+                or _cr_to_proficiency_bonus(cr_val)
+            ),
             exhaustion=int(block.get("exhaustion") or 0),
             position=Position.model_validate(position) if isinstance(position, dict) else None,
         )
@@ -1266,6 +1274,27 @@ def _opt_str(value: Any) -> str | None:
         return None
     s = str(value).strip()
     return s or None
+
+
+def _cr_to_proficiency_bonus(cr: float | None) -> int:
+    """SRD prof-bonus table by challenge rating."""
+    if cr is None:
+        return 2
+    if cr <= 4:
+        return 2
+    if cr <= 8:
+        return 3
+    if cr <= 12:
+        return 4
+    if cr <= 16:
+        return 5
+    if cr <= 20:
+        return 6
+    if cr <= 24:
+        return 7
+    if cr <= 28:
+        return 8
+    return 9
 
 
 def _opt_int(value: Any) -> int | None:

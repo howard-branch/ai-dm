@@ -75,7 +75,7 @@ function findActorToken(scene, actorIdOrName) {
  * Find a target on the scene by name or id. Searches tokens (excluding
  * `excludeTokenId`) then notes. Returns {x, y, width, height} or null.
  */
-function findTargetOnScene(scene, target, excludeTokenId = null) {
+export function findTargetOnScene(scene, target, excludeTokenId = null) {
   if (!scene || !target) return null;
   const want = String(target).toLowerCase().trim();
   const wantWords = _wordSet(want);
@@ -230,6 +230,18 @@ export async function moveActorTo({
     destX = x;
     destY = y;
     resolvedFrom = "explicit_xy";
+    // Multi-actor party move with a pre-resolved anchor: the Python
+    // side resolves the anchor once and ships the same (x, y) to every
+    // member, so without a per-member offset everyone stacks on the
+    // exact same tile. Apply the formation offset here too (mirrors
+    // the named-target branch below) so party arrivals fan out into a
+    // ring around the anchor.
+    if (Number.isFinite(formation_count) && formation_count > 1
+        && Number.isFinite(formation_index) && formation_index > 0) {
+      const [ox, oy] = _formationOffset(formation_index);
+      destX += ox * gridSize;
+      destY += oy * gridSize;
+    }
   } else if (
     !target && !target_token_id &&
     Number.isFinite(distance_ft) && distance_ft > 0 &&

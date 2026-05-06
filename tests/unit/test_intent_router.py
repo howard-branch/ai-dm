@@ -56,3 +56,129 @@ def test_speak_intent_passes_through():
     assert env.resolution is None
     assert env.commands_ok is True
 
+
+# --------------------------------------------------------------------- #
+# Authored-interaction → roll.requested server-side fallback
+# --------------------------------------------------------------------- #
+
+
+def _altar_pack(monkeypatch):
+    """Build a minimal stand-in for a CampaignPack whose ruined chapel
+    has an altar feature with `pray` → Religion DC 12.
+    """
+    altar_feature = {
+        "id": "ruined_altar",
+        "name": "Ruined Altar",
+        "description": "A shattered slab of basalt.",
+        "interactions": [
+            {
+                "verb": "pray",
+                "summary": "Pray to a forgotten god.",
+                "check": "int.religion",
+                "dc": 12,
+                "on_success": "A whisper answers.",
+            }
+        ],
+    }
+    node = {"id": "ruined_chapel", "features": [altar_feature]}
+
+    # Stub the three opening_scene helpers IntentRouter consults.
+    import ai_dm.app.opening_scene as os_mod
+    monkeypatch.setattr(
+        os_mod, "find_scene_node",
+        lambda pack, sid: node if sid == "ruined_chapel" else None,
+    )
+    monkeypatch.setattr(os_mod, "find_scene_anchors", lambda pack, sid: [])
+    monkeypatch.setattr(os_mod, "find_scene_npcs", lambda pack, sid: [])
+    return object()  # any truthy sentinel; the stubs ignore it
+
+
+def test_interact_pray_emits_roll_requested(monkeypatch):
+    pack = _altar_pack(monkeypatch)
+    resolver = ActionResolver(rules=RulesEngine())
+    cr = MagicMock()
+    cr.dispatch.return_value = MagicMock(ok=True)
+    bus = EventBus()
+    seen: list[dict] = []
+    bus.subscribe("roll.requested", lambda p: seen.append(p))
+    router = IntentRouter(
+        action_resolver=resolver, command_router=cr, event_bus=bus,
+        default_scene_id="ruined_chapel", pack=pack,
+    )
+    intent = PlayerIntent(
+        type="interact", verb="pray", actor_id="hero",
+        target_anchor="altar", raw_text="I pray at the altar",
+    )
+    env = router.handle(intent)
+    assert env.commands_ok is True  # highlight still dispatched
+    assert seen, "expected roll.requested to be published"
+    payload = seen[0]
+    assert payload["roll_type"] == "skill"
+    assert payload["key"] == "religion"
+    assert payload["dc"] == 12
+    assert payload["actor_id"] == "hero"
+    assert payload["scene_id"] == "ruined_chapel"
+    assert "religion" in payload["prompt_text"].lower()
+
+
+def test_interact_alias_verb_still_matches(monkeypatch):
+    """Player says "I kneel before the altar" — no exact `kneel` verb
+    on the authored interaction, but the alias map maps it to `pray`.
+    """
+    pack = _altar_pack(monkeypatch)
+    resolver = ActionResolver(rules=RulesEngine())
+    cr = MagicMock(); cr.dispatch.return_value = MagicMock(ok=True)
+    bus = EventBus()
+    seen: list[dict] = []
+    bus.subscribe("roll.requested", lambda p: seen.append(p))
+    router = IntentRouter(
+        action_resolver=resolver, command_router=cr, event_bus=bus,
+        default_scene_id="ruined_chapel", pack=pack,
+    )
+    intent = PlayerIntent(
+        type="interact", verb="kneel", actor_id="hero",
+        target_anchor="ruined altar",
+        raw_text="I kneel before the ruined altar",
+    )
+    router.handle(intent)
+    assert seen and seen[0]["key"] == "religion"
+
+
+def test_interact_without_authored_check_does_not_emit(monkeypatch):
+    """A plain feature with no `check`/`dc` must not synthesise a roll."""
+    import ai_dm.app.opening_scene as os_mod
+    node = {
+        "id": "ruined_chapel",
+        "features": [{
+            "id": "pew", "name": "Wooden Pew",
+            "interactions": [{"verb": "sit", "summary": "Rest a moment."}],
+        }],
+    }
+    monkeypatch.setattr(os_mod, "find_scene_node", lambda pack, sid: node)
+    monkeypatch.setattr(os_mod, "find_scene_anchors", lambda pack, sid: [])
+    monkeypatch.setattr(os_mod, "find_scene_npcs", lambda pack, sid: [])
+    resolver = ActionResolver(rules=RulesEngine())
+    cr = MagicMock(); cr.dispatch.return_value = MagicMock(ok=True)
+    bus = EventBus()
+    seen: list[dict] = []
+    bus.subscribe("roll.requested", lambda p: seen.append(p))
+    router = IntentRouter(
+        action_resolver=resolver, command_router=cr, event_bus=bus,
+        default_scene_id="ruined_chapel", pack=object(),
+    )
+    intent = PlayerIntent(
+        type="interact", verb="sit", actor_id="hero",
+        target_anchor="pew", raw_text="I sit on the pew",
+    )
+    router.handle(intent)
+    assert not seen
+
+
+def test_parse_check_string_variants():
+    parse = IntentRouter._parse_check_string
+    assert parse("int.religion") == ("skill", "religion")
+    assert parse("wis.perception") == ("skill", "perception")
+    assert parse("dex") == ("ability", "dex")
+    assert parse("str.save") == ("save", "str")
+    assert parse("con_save") == ("save", "con")
+    assert parse("athletics") == ("skill", "athletics")

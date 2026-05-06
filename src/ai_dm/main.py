@@ -1,10 +1,40 @@
 from __future__ import annotations
 
 import argparse
+import logging
+import logging.config
 import os
+from pathlib import Path
 
 from ai_dm.app.bootstrap import build_runtime
 from ai_dm.utils.dotenv import load_dotenv
+
+
+def _configure_logging() -> None:
+    """Load ``config/logging.yaml`` if present, else fall back to a
+    sane console default.
+
+    Without this, Python's root logger sits at WARNING with no handler
+    attached, which is why all the ``ai_dm.*`` ``logger.info(...)``
+    calls were silently dropped — including the entire ``npc_turn:``
+    diagnostic stream.
+    """
+    cfg_path = Path(__file__).resolve().parents[2] / "config" / "logging.yaml"
+    if cfg_path.exists():
+        try:
+            import yaml  # type: ignore[import-not-found]
+            with cfg_path.open("r", encoding="utf-8") as fh:
+                logging.config.dictConfig(yaml.safe_load(fh))
+            logging.getLogger("ai_dm").info(
+                "logging configured from %s", cfg_path,
+            )
+            return
+        except Exception as exc:  # noqa: BLE001
+            print(f"[ai-dm] failed to load {cfg_path}: {exc}; using basicConfig")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    )
 
 
 def _parse_args() -> argparse.Namespace:
@@ -25,6 +55,10 @@ def _parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    # Configure logging FIRST so module-level logger creation in
+    # bootstrap (and everything it imports) inherits the right levels
+    # and the console handler.
+    _configure_logging()
     args = _parse_args()
     if args.new_character:
         os.environ["AI_DM_NEW_CHARACTER"] = "1"

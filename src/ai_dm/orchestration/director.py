@@ -24,6 +24,7 @@ class Director:
         intent_router: IntentRouter | None = None,
         intent_parser: IntentParser | None = None,
         event_bus: EventBus | None = None,
+        roll_request_dispatcher=None,
     ) -> None:
         self.state_store = state_store
         self.narrator = narrator or Narrator()
@@ -33,6 +34,7 @@ class Director:
         self.intent_router = intent_router
         self.intent_parser = intent_parser
         self.event_bus = event_bus
+        self.roll_request_dispatcher = roll_request_dispatcher
 
     def handle_player_input(
         self,
@@ -41,13 +43,42 @@ class Director:
         focus_npcs: Iterable[str] | None = None,
         scene_id: str | None = None,
         actor_id: str | None = None,
+        origin: str | None = None,
     ) -> AIOutput:
         # Phase 3.1: parse the utterance for a mechanical intent (move,
         # attack, skill check, …) BEFORE running the narrator. Movement
         # / interact intents are dispatched directly through the
         # IntentRouter so the token actually moves on the canvas; the
         # narrator still runs afterwards to describe the action.
-        self._maybe_dispatch_intent(player_input, scene_id=scene_id, actor_id=actor_id)
+        #
+        # Skip intent dispatch entirely for synthetic follow-up turns
+        # fired from the roll-request dispatcher (origin
+        # ``"roll_request_dispatcher"``). The synthetic text quotes
+        # the player's original utterance (``said: "attack grukk"``)
+        # which the parser otherwise re-interprets as a fresh attack
+        # — and the deferred-attack code path then opens *another*
+        # roll dialog every turn, infinitely. We just want the LLM
+        # to narrate the rolled outcome here.
+        envelope = None
+        if origin != "roll_request_dispatcher":
+            envelope = self._maybe_dispatch_intent(
+                player_input, scene_id=scene_id, actor_id=actor_id,
+            )
+
+        # Deferred attack: the router handed mechanical resolution off
+        # to a player roll dialog. Skip narrator + command dispatch
+        # here — the resume callback (PCAttackResolver +
+        # RollRequestDispatcher._enqueue_followup) will re-fire a
+        # fresh ``foundry.player_input`` carrying the rolled outcome
+        # and *that* turn drives the narration. Running the narrator
+        # now produces (a) a second roll dialog from the LLM's own
+        # ``dice_requests`` and (b) a stale narration that doesn't
+        # know whether the player hit. Both showed up in the wild.
+        if envelope is not None and envelope.deferred:
+            return AIOutput(
+                narration="",
+                metadata={"deferred": True, "commands_ok": True},
+            )
 
         context = self._build_context(player_input, focus_npcs=focus_npcs, scene_id=scene_id)
         result = self.narrator.narrate(player_input=player_input, context=context)
@@ -73,6 +104,19 @@ class Director:
 
         self.state_store.apply_state_updates(result.state_updates)
         outcome = self.command_router.dispatch(result.commands)
+
+        # Translate any LLM-emitted ``dice_requests`` into player-facing
+        # roll prompts in Foundry. Requires the dispatcher to have been
+        # wired (no-op in unit tests with a bare Director).
+        if result.dice_requests and self.roll_request_dispatcher is not None:
+            try:
+                self.roll_request_dispatcher.emit_from_dice_requests(
+                    result.dice_requests,
+                    actor_id=actor_id,
+                    scene_id=scene_id,
+                )
+            except Exception:  # noqa: BLE001
+                pass
 
         self._record_dialogue(result.dialogue)
 
@@ -117,35 +161,37 @@ class Director:
         *,
         scene_id: str | None,
         actor_id: str | None,
-    ) -> None:
+    ):
         """Run the IntentParser and route mechanical intents through the
         IntentRouter so they reach the canvas (move tokens etc).
 
-        No-op when no parser/router is wired (e.g. in unit tests with a
-        bare Director). Failures are swallowed so they never break the
-        narrator flow that runs immediately after.
+        Returns the :class:`IntentEnvelope` from the router (so callers
+        can check ``envelope.deferred``) or ``None`` when no parser/
+        router is wired or parsing failed. Failures are swallowed so
+        they never break the narrator flow that runs immediately
+        after.
         """
         if self.intent_parser is None or self.intent_router is None:
-            return
+            return None
         try:
             intent = self.intent_parser.parse(text, ctx={
                 "scene_id": scene_id,
                 "actor_id": actor_id,
             })
         except Exception:  # noqa: BLE001
-            return
+            return None
         if intent.type not in self._MECHANICAL_INTENT_TYPES:
-            return
+            return None
         # Override the parser's default actor_id ("player") with the
         # real Foundry actor id from the chat event.
         if actor_id:
             intent.actor_id = actor_id
         try:
-            self.intent_router.handle(
+            return self.intent_router.handle(
                 intent, ctx={"scene_id": scene_id, "actor_id": actor_id}
             )
         except Exception:  # noqa: BLE001
-            return
+            return None
 
     def _record_dialogue(self, dialogue: list[NPCDialogueLine]) -> None:
         if not dialogue or self.npc_memory is None:

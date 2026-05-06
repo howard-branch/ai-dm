@@ -1,0 +1,19 @@
+{
+  "type": "event",
+  "event": "request_player_roll",
+  "payload": {
+    "request_id": "prq-example-perception-1",
+    "actor_id": "Sansa",
+    "roll_type": "skill",
+    "key": "perception",
+    "dc": 15,
+    "ac": null,
+    "advantage": "normal",
+    "formula": "1d20",
+    "prompt_text": "Make a Perception check (DC 15)",
+    "visibility": "public",
+    "expires_in_s": 30,
+    "reason": "scanning the chapel for the source of the chant"
+  }
+}
+

@@ -160,6 +160,53 @@ async function _dispatchCommand(command) {
         await updateActor(command.actor_id, command.patch || {});
         return { ok: true, command_type: command.type };
 
+      case "apply_damage": {
+        // Python is authoritative on the new HP. We translate amount
+        // → an actor.update({system.attributes.hp.value}) so the
+        // sheet/token bar matches. Best-effort actor lookup: id, then
+        // name.
+        const aid = command.actor_id;
+        const amount = Number(command.amount || 0);
+        let actor = aid ? game.actors?.get(aid) : null;
+        if (!actor && aid) {
+          actor = (game.actors?.contents ?? []).find(
+            (a) => a.name === aid || a.name?.toLowerCase() === String(aid).toLowerCase()
+          ) || null;
+        }
+        if (!actor) {
+          console.warn("AI DM Bridge: apply_damage — no such actor", aid);
+          return { ok: false, error: "unknown_actor", command_type: command.type };
+        }
+        const hpPath = "system.attributes.hp";
+        const hp = foundry.utils.getProperty(actor, hpPath) || {};
+        const cur = Number(hp.value ?? 0);
+        const tmp = Number(hp.temp ?? 0);
+        const absorbed = Math.min(tmp, amount);
+        const remaining = amount - absorbed;
+        const newTmp = Math.max(0, tmp - absorbed);
+        const newHp = Math.max(0, cur - remaining);
+        try {
+          await actor.update({
+            "system.attributes.hp.value": newHp,
+            "system.attributes.hp.temp": newTmp,
+          });
+        } catch (err) {
+          console.warn("AI DM Bridge: apply_damage actor.update failed", err);
+          return { ok: false, error: String(err), command_type: command.type };
+        }
+        return {
+          ok: true,
+          command_type: command.type,
+          actorId: actor.id,
+          hpBefore: cur,
+          hpAfter: newHp,
+          tempAbsorbed: absorbed,
+          dealt: remaining,
+          damageType: command.damage_type ?? "untyped",
+          crit: !!command.crit,
+        };
+      }
+
       case "highlight_object":
         await highlightObject(command.target_id);
         return { ok: true, command_type: command.type };
@@ -564,6 +611,20 @@ Hooks.once("ready", async () => {
     const { renderLobbyStatus } = await import("./lobby_renderer.js");
     return renderLobbyStatus(payload);
   });
+
+  // Phase 4: interactive roll prompts.
+  //   request_player_roll → render a chat card with a "Roll" button.
+  //                          The click handler (installed below) fires
+  //                          ``player_roll_resolved`` back to Python.
+  //   chat_roll           → DM-side roll already resolved by Python;
+  //                          render a styled chat card for visibility.
+  {
+    const { renderRollPrompt, renderChatRoll, installRollPromptHooks } =
+        await import("./roll_prompt.js");
+    registerInboundEvent("request_player_roll", async (payload) => renderRollPrompt(payload));
+    registerInboundEvent("chat_roll", async (payload) => renderChatRoll(payload));
+    installRollPromptHooks();
+  }
 
   // Character-creation wizard prompt from Python. Opens a Dialog and
   // sends the player's choices back as a wizard_response event.

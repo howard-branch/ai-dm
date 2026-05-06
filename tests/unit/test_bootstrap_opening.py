@@ -1,8 +1,10 @@
 """Tests for the bootstrap → opening-narration wiring.
 
-Specifically: `_emit_opening_narration` must (a) push the chat envelope
-to the Foundry client AND (b) publish a `narrator.output_ready` event
-on the EventBus so the audio dispatcher reads the opening aloud.
+`_emit_opening_narration` pushes the chat envelope to the Foundry client.
+It deliberately does NOT republish the prose on ``narrator.output_ready``
+— packs that author a ``scene.entered`` trigger handle the spoken intro
+themselves, and double-publishing made the player hear two openings
+back-to-back at startup.
 """
 from __future__ import annotations
 
@@ -80,7 +82,7 @@ def test_emit_opening_pushes_chat_event(pack: CampaignPack) -> None:
     assert payload["narration"].startswith("A cloistered limestone square")
 
 
-def test_emit_opening_publishes_to_audio_bus(pack: CampaignPack) -> None:
+def test_emit_opening_does_not_publish_to_audio_bus(pack: CampaignPack) -> None:
     client = FakeClient()
     bus = EventBus()
     container = SimpleNamespace(client=client, event_bus=bus)
@@ -90,15 +92,10 @@ def test_emit_opening_publishes_to_audio_bus(pack: CampaignPack) -> None:
 
     _emit_opening_narration(pack, container, pc_id="pc", user_id=None)
 
-    assert len(received) == 1
-    spoken = received[0]["narration"]
-    # Prose first…
-    assert spoken.startswith("A cloistered limestone square")
-    # …then a TTS-friendly affordances sentence built from interactables.
-    assert "Dry Well" in spoken
-    # …then exits.
-    assert "Exits:" in spoken and "gate" in spoken
-    assert received[0]["source"] == "opening"
+    # Audio is owned by the authored ``scene.entered`` trigger (e.g.
+    # ``start_intro``). The deterministic opening only emits the chat
+    # envelope so the player isn't read two openings back-to-back.
+    assert received == []
 
 
 def test_emit_opening_skips_when_no_client(pack: CampaignPack) -> None:

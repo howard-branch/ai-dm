@@ -52,8 +52,31 @@ def make_attack(
     attack_modifier: int,
     target_ac: int,
     advantage: str = "normal",
+    preroll_d20: int | None = None,
 ) -> AttackResult:
-    roll = roller.roll("1d20", advantage=advantage)  # type: ignore[arg-type]
+    """Resolve a single attack roll.
+
+    ``preroll_d20`` lets a caller (e.g. the chat-attack flow that
+    routed the d20 through the player's Foundry roll dialog) supply
+    the d20 result instead of asking ``roller`` for one. The value
+    must already account for advantage / disadvantage — we honour
+    nat-20 / nat-1 from it and skip the dice spin entirely so the
+    server side cannot accidentally re-roll behind the player's back.
+    """
+    if preroll_d20 is not None:
+        n = max(1, min(20, int(preroll_d20)))
+        roll = RollResult(
+            expression="1d20",
+            rolls=[n],
+            kept=[n],
+            modifier=0,
+            total=n,
+            advantage=advantage,  # type: ignore[arg-type]
+            crit=(n == 20),
+            fumble=(n == 1),
+        )
+    else:
+        roll = roller.roll("1d20", advantage=advantage)  # type: ignore[arg-type]
     total = roll.total + attack_modifier
     # 5e: nat 20 always hits; nat 1 always misses.
     if roll.crit:

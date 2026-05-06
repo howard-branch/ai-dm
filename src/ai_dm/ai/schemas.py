@@ -15,6 +15,15 @@ class DiceRequest(BaseModel):
     skill: str | None = None
     dc: int | None = None
     reason: str | None = None
+    # Phase 4: extended fields the roll-prompt pipeline understands.
+    # All optional; older LLM payloads continue to validate.
+    advantage: str | None = None        # "advantage" | "disadvantage" | "normal"
+    formula: str | None = None          # raw dice expression override (e.g. "2d6+3")
+    request_id: str | None = None       # caller-supplied id; auto-generated if absent
+    visibility: str | None = None       # "public" | "gm" | "self"
+    ac: int | None = None               # for attacks
+    actor_id: str | None = None         # canonical id (preferred over loose ``actor``)
+    prompt_text: str | None = None      # override message shown on the roll card
 
 
 class Command(BaseModel):
@@ -45,6 +54,21 @@ class Command(BaseModel):
     formation_index: int | None = None
     formation_count: int | None = None
     patch: dict = Field(default_factory=dict)
+    # give_item extensions:
+    #   item_key   — content-pack id of the granted item
+    #   qty        — copies to insert (default 1)
+    #   container  — optional sub-container name on the actor
+    item_key: str | None = None
+    qty: int | None = None
+    container: str | None = None
+    # apply_damage extensions:
+    #   amount       — integer HP to apply (post-resistance, post-temp_hp).
+    #   damage_type  — SRD damage type (slashing/fire/...). Defaults to
+    #                  "untyped" on the JS side.
+    #   crit         — flag forwarded for chat display.
+    amount: int | None = None
+    damage_type: str | None = None
+    crit: bool | None = None
 
 
 class StateUpdate(BaseModel):

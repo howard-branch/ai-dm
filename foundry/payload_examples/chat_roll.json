@@ -1,0 +1,24 @@
+{
+  "type": "event",
+  "event": "chat_roll",
+  "payload": {
+    "request_id": "dm-example-stealth-1",
+    "actor_id": "Goblin Scout",
+    "roll_type": "skill",
+    "key": "stealth",
+    "formula": "1d20+6",
+    "total": 22,
+    "modifier": 6,
+    "rolls": [16],
+    "kept": [16],
+    "advantage": "normal",
+    "crit": false,
+    "fumble": false,
+    "dc": 14,
+    "ac": null,
+    "success": true,
+    "visibility": "gm",
+    "reason": "scout approaches the camp unseen"
+  }
+}
+

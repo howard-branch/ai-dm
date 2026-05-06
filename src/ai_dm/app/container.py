@@ -5,9 +5,12 @@ together without reaching for module-level globals.
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
+
+logger = logging.getLogger("ai_dm.app.container")
 
 from ai_dm.ai.client import AIClient
 from ai_dm.ai.context_builder import PromptContextBuilder
@@ -41,22 +44,33 @@ from ai_dm.foundry.sync_service import SyncService
 from ai_dm.foundry.validator import CommandValidator
 from ai_dm.game.combat_machine import CombatMachine
 from ai_dm.game.clock import Clock
+from ai_dm.game.encounter_manager import EncounterManager
 from ai_dm.game.location_loader import load_directory as load_locations_dir
 from ai_dm.game.location_service import LocationService
+from ai_dm.game.party_state import PartyState
 from ai_dm.game.timeline import Timeline
 from ai_dm.game.trigger_loader import load_triggers
 from ai_dm.memory.npc_memory import NPCMemoryStore
 from ai_dm.memory.relationships import RelationshipMatrix
 from ai_dm.orchestration.actor_session import ActorSessionRegistry
 from ai_dm.orchestration.command_router import CommandRouter
+from ai_dm.orchestration.combat_projector import CombatProjector
 from ai_dm.orchestration.event_bus import EventBus
+from ai_dm.orchestration.npc_turn_driver import NPCTurnDriver
 from ai_dm.orchestration.player_input_dispatcher import PlayerInputDispatcher
+from ai_dm.orchestration.roll_request_dispatcher import RollRequestDispatcher
 from ai_dm.orchestration.structured_intent_dispatcher import StructuredIntentDispatcher
 from ai_dm.orchestration.triggers import TriggerEngine
 from ai_dm.orchestration.turn_manager import TurnManager
+from ai_dm.orchestration.xp_collector import XPCollector
+from ai_dm.orchestration.xp_awarder import XPAwarder
+from ai_dm.orchestration.interaction_effects import InteractionEffectsApplier
+from ai_dm.orchestration.pc_attack_resolver import PCAttackResolver
 from ai_dm.persistence.backups import BackupService
 from ai_dm.persistence.campaign_store import CampaignStore
+from ai_dm.persistence.roll_log import RollLog
 from ai_dm.rules.action_resolver import ActionResolver
+from ai_dm.rules.dm_rolls import DMRoller
 from ai_dm.rules.engine import RulesEngine
 from ai_dm.services.chapter_service import ChapterService
 
@@ -108,6 +122,10 @@ class ContainerConfig:
     # below decides what happens to GM-side mutations.
     authority_policy: AuthorityPolicy = field(default_factory=AuthorityPolicy)
     echo_suppression_ttl: float = 3.0
+    # Rolls (Phase 4): player-facing roll prompts + DM-side rolls.
+    rolls_enabled: bool = True
+    rolls_timeout_s: float = 30.0
+    rolls_on_timeout: str = "auto_roll"     # auto_roll | cancel | gm_prompt
 
     def resolved_pack(self) -> CampaignPack:
         """Return the active pack, building a legacy one if needed."""
@@ -168,6 +186,17 @@ class Container:
     actor_sessions: Optional[ActorSessionRegistry] = None
     player_input_dispatcher: Optional[PlayerInputDispatcher] = None
     structured_intent_dispatcher: Optional[StructuredIntentDispatcher] = None
+    roll_log: Optional[RollLog] = None
+    dm_roller: Optional[DMRoller] = None
+    roll_request_dispatcher: Optional[RollRequestDispatcher] = None
+    party_state: Optional[PartyState] = None
+    xp_collector: Optional[XPCollector] = None
+    xp_awarder: Optional[XPAwarder] = None
+    encounter_manager: Optional[EncounterManager] = None
+    interaction_effects: Optional[InteractionEffectsApplier] = None
+    pc_attack_resolver: Optional[PCAttackResolver] = None
+    combat_projector: Optional[CombatProjector] = None
+    npc_turn_driver: Optional[NPCTurnDriver] = None
     token_state: dict[str, Any] = field(default_factory=dict)
     scene_state: dict[str, Any] = field(default_factory=dict)
     flags: dict[str, Any] = field(default_factory=dict)
@@ -269,6 +298,129 @@ class Container:
         combat = CombatMachine(event_bus=event_bus, command_router=router)
         turn_manager = TurnManager(combat=combat)
 
+        # Now that ``combat`` exists, wire a live actor lookup on the
+        # action resolver so attack/damage resolution mutates real
+        # combatants in ``combat.state.participants`` instead of
+        # short-lived ActorRuleState stubs (which would silently
+        # discard HP changes — the original "target doesn't take
+        # damage" bug).
+        #
+        # Matching is intentionally fuzzy: the LLM/director frequently
+        # emits the bare word the player typed (e.g. ``"grukk"``)
+        # while the authored encounter declares the monster as
+        # ``"mon.grukk"`` with display name ``"Grukk"``. Without the
+        # fuzzy fallback every free-text attack lands on a stub at
+        # hp=0 and the canvas-side ``apply_damage`` is rejected with
+        # ``unknown_actor``.
+        def _actor_lookup(key: str):
+            if combat.state is None or not key:
+                if combat.state is None:
+                    logger.debug(
+                        "npc_turn: actor_lookup(%r) — no encounter live "
+                        "(combat.state is None); returning stub", key,
+                    )
+                return None
+            participants = list(combat.state.participants)
+            # 1) exact actor_id / token_id match.
+            for p in participants:
+                if p.actor_id == key or p.token_id == key:
+                    return p
+            # 2) case-insensitive match on actor_id, token_id, or name.
+            norm = str(key).strip().lower()
+            for p in participants:
+                if (
+                    str(p.actor_id).lower() == norm
+                    or (p.token_id and str(p.token_id).lower() == norm)
+                    or (getattr(p, "name", None) and str(p.name).lower() == norm)
+                ):
+                    logger.info(
+                        "npc_turn: actor_lookup fuzzy-matched %r → %s "
+                        "(name=%r) via case-insensitive id/name",
+                        key, p.actor_id, getattr(p, "name", None),
+                    )
+                    return p
+            # 3) suffix-after-dot match: ``"grukk"`` → ``"mon.grukk"``
+            #    / ``"npc.grukk"``. Pick the foe-side combatant first
+            #    so we don't accidentally damage a friendly NPC sharing
+            #    the same short name.
+            suffix_matches = [
+                p for p in participants
+                if "." in str(p.actor_id)
+                and str(p.actor_id).split(".", 1)[1].lower() == norm
+            ]
+            suffix_matches.sort(key=lambda p: 0 if getattr(p, "team", None) == "foe" else 1)
+            if suffix_matches:
+                p = suffix_matches[0]
+                logger.info(
+                    "npc_turn: actor_lookup fuzzy-matched %r → %s "
+                    "(name=%r) via suffix-after-dot",
+                    key, p.actor_id, getattr(p, "name", None),
+                )
+                return p
+            # 4) registry alias resolution: foundry id ↔ pack id.
+            try:
+                fid = registry.resolve("actor", key)
+            except Exception:  # noqa: BLE001
+                fid = None
+            if fid:
+                entry = registry.get("actor", fid)
+                aliases = set(entry.aliases) if entry else set()
+                aliases.add(fid)
+                for p in participants:
+                    if p.actor_id in aliases or p.token_id in aliases:
+                        logger.info(
+                            "npc_turn: actor_lookup matched %r → %s via "
+                            "registry alias %s",
+                            key, p.actor_id, fid,
+                        )
+                        return p
+            logger.warning(
+                "npc_turn: actor_lookup MISS for %r — no participant matches "
+                "by id/token/name/suffix/alias. Live participants=%s. "
+                "Damage will land on a STUB (hp=0) and Foundry projection "
+                "will be rejected with unknown_actor.",
+                key,
+                [
+                    {"actor_id": p.actor_id, "name": getattr(p, "name", None),
+                     "token_id": p.token_id, "team": getattr(p, "team", None)}
+                    for p in participants
+                ],
+            )
+            return None
+
+        action_resolver.actor_lookup = _actor_lookup
+        # SpellResolver was constructed with the (None) lookup; refresh.
+        try:
+            action_resolver._spell_resolver.actor_lookup = _actor_lookup
+        except Exception:  # noqa: BLE001
+            pass
+        # Expose to combat_projector so it can resolve 'grukk' → 'Grukk'
+        # for the Foundry-side name match before dispatching apply_damage.
+        combat._actor_lookup = _actor_lookup  # noqa: SLF001 — informal hook
+
+        # Inject the combat machine into the prompt builder so the
+        # narrator gets a ``combat`` block (round, current actor, HP
+        # of every participant) when an encounter is live, and
+        # describes the fight rather than ambient atmosphere.
+        prompt_context.combat = combat
+
+        # Party-level XP / level state. Mutated in place by:
+        #   * XPCollector (combat banking + finalisation)
+        #   * InteractionEffectsApplier (story / interaction xp)
+        # Persisted via CampaignStore.
+        party_state = PartyState()
+        xp_collector = XPCollector(
+            event_bus=event_bus,
+            combat=combat,
+            party_state=party_state,
+            client=client,
+        )
+        xp_awarder = XPAwarder(
+            event_bus=event_bus,
+            party_state=party_state,
+            client=client,
+        )
+
         # In-game clock — constructed early so IntentRouter and the
         # trigger engine can both reach it. Save state is restored
         # below if a campaign save exists.
@@ -279,6 +431,7 @@ class Container:
             command_router=router,
             event_bus=event_bus,
             clock=clock,
+            combat=combat,
         )
 
         # ---- Phase 3: planner ---- #
@@ -291,13 +444,56 @@ class Container:
         )
         prompt_context.story_planner = story_planner
 
+        # Encounter facade — depends on combat + chapter_service so it
+        # lives here. Used by InteractionEffectsApplier (below) to
+        # drive starts_encounter / ends_encounter authored hooks.
+        encounter_manager = EncounterManager(
+            combat=combat, chapters=chapter_service, event_bus=event_bus,
+            pack=pack, turn_manager=turn_manager, story_planner=story_planner,
+            command_router=router,
+        )
+        interaction_effects = InteractionEffectsApplier(
+            event_bus=event_bus,
+            command_router=router,
+            encounter_manager=encounter_manager,
+        )
+
+        # Resumes player chat-driven attacks deferred to the Foundry
+        # roll dialog. Subscribed to ``roll.resolved``; runs the
+        # ActionResolver with the player's d20 baked in.
+        pc_attack_resolver = PCAttackResolver(
+            event_bus=event_bus,
+            action_resolver=action_resolver,
+            turn_manager=turn_manager,
+            combat=combat,
+        )
+
+        # Projects ``rules.damage_applied`` events into Foundry
+        # ``apply_damage`` commands so the canvas/sheet reflect the
+        # Python-side HP change.
+        combat_projector = CombatProjector(
+            event_bus=event_bus, command_router=router, combat=combat,
+        )
+        # Drives AI-controlled combatants on their highlighted turn so
+        # the encounter doesn't stall waiting for a goblin to act.
+        npc_turn_driver = NPCTurnDriver(
+            event_bus=event_bus,
+            combat=combat,
+            rules=rules,
+            turn_manager=turn_manager,
+            client=client,
+        )
+
         # Late-bind the travel deps now that the planner exists. The
         # router needs the pack (for nodes.json + scene_locations) and
         # the client (to push a fresh opening narration after a scene
-        # change).
+        # change). Encounter_manager is also bound here so attack
+        # intents can auto-start the scene's authored encounter when
+        # combat isn't already live.
         intent_router.story_planner = story_planner
         intent_router.pack = pack
         intent_router.client = client
+        intent_router.encounter_manager = encounter_manager
 
         # ---- Audio (TTS) ---- #
         tts = cfg.audio_backend or (
@@ -368,6 +564,8 @@ class Container:
                     "combat": combat,
                     "chapters": chapter_service,
                     "clock": clock,
+                    "turn_manager": turn_manager,
+                    "encounter_manager": encounter_manager,
                 }
                 triggers.load(load_triggers(pack.paths.triggers, deps=deps))
             except Exception:  # noqa: BLE001
@@ -436,6 +634,7 @@ class Container:
             foundry_journals=foundry_journals,
             actor_state=actor_state,
             clock=clock,
+            party_state=party_state,
         )
 
         if cfg.auto_load and campaign_store.save_path.exists():
@@ -455,10 +654,39 @@ class Container:
             intent_router=intent_router,
             combat=combat,
             client=client,
+            turn_manager=turn_manager,
+        )
+        # Roll-prompt pipeline (Phase 4). Owns the audit log under
+        # ``<state_root>/logs/rolls.jsonl``, a DMRoller for hidden /
+        # auto-roll rolls, and the dispatcher that emits
+        # ``request_player_roll`` events to Foundry and resumes the
+        # narration loop on ``foundry.player_roll_resolved``.
+        roll_log = RollLog(state_root=pack.state.root)
+        dm_roller = DMRoller(
+            roll_log=roll_log,
+            client=client,
+            event_bus=event_bus,
+        )
+        roll_request_dispatcher = RollRequestDispatcher(
+            event_bus=event_bus,
+            client=client,
+            roll_log=roll_log,
+            dm_roller=dm_roller,
+            timeout_s=cfg.rolls_timeout_s,
+            on_timeout=cfg.rolls_on_timeout,
+            enabled=cfg.rolls_enabled,
         )
         if cfg.inbound_foundry_enabled:
             player_input_dispatcher.start()
             structured_intent_dispatcher.start()
+            xp_collector.start()
+            xp_awarder.start()
+            interaction_effects.start()
+            combat_projector.start()
+            npc_turn_driver.start()
+            if cfg.rolls_enabled:
+                roll_request_dispatcher.start()
+                pc_attack_resolver.start()
 
         # ---- Voice input pump (host mic → foundry.player_input) ---- #
         # Constructed unconditionally so it can be flipped on at any
@@ -526,6 +754,17 @@ class Container:
             actor_sessions=actor_sessions,
             player_input_dispatcher=player_input_dispatcher,
             structured_intent_dispatcher=structured_intent_dispatcher,
+            roll_log=roll_log,
+            dm_roller=dm_roller,
+            roll_request_dispatcher=roll_request_dispatcher,
+            party_state=party_state,
+            xp_collector=xp_collector,
+            xp_awarder=xp_awarder,
+            encounter_manager=encounter_manager,
+            interaction_effects=interaction_effects,
+            pc_attack_resolver=pc_attack_resolver,
+            combat_projector=combat_projector,
+            npc_turn_driver=npc_turn_driver,
             voice_pump=voice_pump,
             voice_control=voice_control,
             flags=flags,
@@ -574,6 +813,36 @@ class Container:
         if self.structured_intent_dispatcher is not None:
             try:
                 self.structured_intent_dispatcher.stop()
+            except Exception:  # noqa: BLE001
+                pass
+        if self.roll_request_dispatcher is not None:
+            try:
+                self.roll_request_dispatcher.stop()
+            except Exception:  # noqa: BLE001
+                pass
+        if self.xp_collector is not None:
+            try:
+                self.xp_collector.stop()
+            except Exception:  # noqa: BLE001
+                pass
+        if self.xp_awarder is not None:
+            try:
+                self.xp_awarder.stop()
+            except Exception:  # noqa: BLE001
+                pass
+        if self.interaction_effects is not None:
+            try:
+                self.interaction_effects.stop()
+            except Exception:  # noqa: BLE001
+                pass
+        if self.combat_projector is not None:
+            try:
+                self.combat_projector.stop()
+            except Exception:  # noqa: BLE001
+                pass
+        if self.npc_turn_driver is not None:
+            try:
+                self.npc_turn_driver.stop()
             except Exception:  # noqa: BLE001
                 pass
         if self.voice_control is not None:

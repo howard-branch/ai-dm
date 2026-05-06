@@ -8,6 +8,7 @@ and meta verbs are passed through as data only.
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -26,12 +27,71 @@ from ai_dm.rules.validators import validate_intent
 logger = logging.getLogger("ai_dm.intent.router")
 
 
+# Detect a target string that is really a directional move payload that
+# slipped through as a free-form anchor name — e.g. "north 10 feet",
+# "10 ft north", "north 10". Without this the value gets shipped to
+# Foundry as ``move_actor_to "north 10 feet"`` and fails with
+# "target not found on scene". The parser handles the common phrasings
+# upstream, but LLM-driven structured intents and chat shortcuts can
+# still produce this shape, so we normalise defensively here too.
+_CARDINAL_TOKENS = (
+    "northeast", "northwest", "southeast", "southwest",
+    "north", "south", "east", "west",
+    "ne", "nw", "se", "sw", "n", "s", "e", "w",
+    "up", "down", "left", "right",
+)
+_DIR_DIST_RE = re.compile(
+    r"^\s*(?P<cardinal>" + "|".join(_CARDINAL_TOKENS) + r")"
+    r"(?:\s+(?P<dist>\d{1,3})\s*(?:ft|feet|foot|')?)?\s*$",
+    re.IGNORECASE,
+)
+_DIST_DIR_RE = re.compile(
+    r"^\s*(?P<dist>\d{1,3})\s*(?:ft|feet|foot|')?"
+    r"\s+(?P<cardinal>" + "|".join(_CARDINAL_TOKENS) + r")\s*$",
+    re.IGNORECASE,
+)
+
+
+def _normalise_directional_target(intent: PlayerIntent) -> PlayerIntent:
+    """If ``target_anchor`` is really a directional payload, lift it
+    into ``direction`` / ``distance_ft`` and clear the bogus anchor.
+    """
+    raw = (intent.target_anchor or "").strip()
+    if not raw:
+        return intent
+    m = _DIR_DIST_RE.match(raw) or _DIST_DIR_RE.match(raw)
+    if not m:
+        return intent
+    cardinal = m.group("cardinal").lower()
+    dist_s = m.group("dist")
+    try:
+        dist = int(dist_s) if dist_s else intent.distance_ft
+    except (TypeError, ValueError):
+        dist = intent.distance_ft
+    logger.info(
+        "move: rewrote target_anchor=%r as direction=%s distance_ft=%s",
+        raw, cardinal, dist,
+    )
+    return intent.model_copy(update={
+        "target_anchor": None,
+        "direction": cardinal,
+        "distance_ft": dist,
+    })
+
+
 @dataclass
 class IntentEnvelope:
     intent: PlayerIntent
     resolution: ActionResolution | None = None
     commands_ok: bool = True
     rejected_reason: str | None = None
+    # True when the router handed mechanical resolution off to an
+    # asynchronous source (e.g. a player roll dialog round-tripped
+    # through Foundry). The Director uses this to skip the narrator
+    # turn — narration will be re-fired by the resume callback so
+    # we don't run the LLM twice (and emit a duplicate roll dialog
+    # the second time).
+    deferred: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -39,6 +99,7 @@ class IntentEnvelope:
             "resolution": self.resolution.to_dict() if self.resolution else None,
             "commands_ok": self.commands_ok,
             "rejected_reason": self.rejected_reason,
+            "deferred": self.deferred,
         }
 
 
@@ -54,6 +115,8 @@ class IntentRouter:
         pack: Any = None,                  # ai_dm.campaign.pack.CampaignPack
         client: Any = None,                # ai_dm.foundry.client.FoundryClient
         clock: Any = None,                 # ai_dm.game.clock.Clock
+        encounter_manager: Any = None,     # ai_dm.game.encounter_manager.EncounterManager
+        combat: Any = None,                # ai_dm.game.combat_machine.CombatMachine
     ) -> None:
         self.action_resolver = action_resolver
         self.command_router = command_router
@@ -63,6 +126,8 @@ class IntentRouter:
         self.pack = pack
         self.client = client
         self.clock = clock
+        self.encounter_manager = encounter_manager
+        self.combat = combat
 
     def handle(self, intent: PlayerIntent, ctx: dict | None = None) -> IntentEnvelope:
         ok, reason = validate_intent(intent)
@@ -79,6 +144,22 @@ class IntentRouter:
             "attack", "skill_check", "cast_spell", "use_item",
             "dash", "disengage", "dodge", "help", "hide", "ready", "end_turn",
         ):
+            # Auto-start the scene's authored encounter on the first
+            # ``attack`` intent so the rules engine resolves against
+            # real CombatantStates (with the foe's authored AC and HP)
+            # instead of throw-away ActorRuleState stubs (AC 10 / HP 0
+            # — the "need 0 to hit, target HP doesn't decrease" bug).
+            if intent.type == "attack":
+                self._maybe_autostart_encounter(intent, ctx)
+                self._maybe_retarget_attack(intent, ctx)
+                # If this PC chat attack should go through the player's
+                # Foundry roll dialog, defer mechanical resolution until
+                # the d20 comes back; PCAttackResolver will pick it up
+                # on ``roll.resolved`` and finish the attack.
+                if self._defer_pc_attack(intent, ctx):
+                    envelope.deferred = True
+                    self._publish("intent.resolved", envelope.to_dict())
+                    return envelope
             envelope.resolution = self.action_resolver.resolve_intent(intent, ctx)
         elif intent.type == "move" and self.command_router is not None:
             envelope.commands_ok = self._dispatch_move(intent, ctx)
@@ -86,6 +167,14 @@ class IntentRouter:
             envelope.commands_ok = self._dispatch_travel(intent, ctx)
         elif intent.type == "interact" and self.command_router is not None:
             envelope.commands_ok = self._dispatch_highlight(intent)
+            # Server-side safety net: if the targeted feature has an
+            # authored interaction with `check` + `dc`, publish a
+            # `roll.requested` event so the dispatcher fires even when
+            # the LLM forgets to populate `dice_requests`.
+            try:
+                self._maybe_request_authored_roll(intent, ctx)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("authored roll lookup failed: %s", exc)
         # speak / use_item / meta / query_world / unknown: data-only
 
         self._publish("intent.resolved", envelope.to_dict())
@@ -93,7 +182,229 @@ class IntentRouter:
 
     # ------------------------------------------------------------------ #
 
+    # ------------------------------------------------------------------ #
+    # Combat helpers (auto-start + target retargeting)
+    # ------------------------------------------------------------------ #
+
+    def _maybe_autostart_encounter(self, intent: PlayerIntent, ctx: dict) -> None:
+        """Start the scene's authored encounter when the player swings
+        and no combat is live. No-op when the dependencies aren't
+        wired (unit tests) or the scene has no authored encounter.
+        """
+        if self.encounter_manager is None:
+            return
+        s = getattr(self.combat, "state", None) if self.combat is not None else None
+        if s is not None and getattr(s, "phase", None) not in (None, "ended"):
+            return  # encounter already in progress
+        scene_id = ctx.get("scene_id") or self.default_scene_id
+        if not scene_id:
+            return
+        try:
+            eid = self.encounter_manager.start_for_scene(
+                scene_id, reason="attack_intent",
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("auto-start encounter failed: %s", exc)
+            return
+        if eid:
+            logger.info(
+                "attack intent on scene %s auto-started encounter %s",
+                scene_id, eid,
+            )
+
+    # ------------------------------------------------------------------ #
+
+    def _defer_pc_attack(self, intent: PlayerIntent, ctx: dict) -> bool:
+        """If the attacker is a player-controlled combatant and we
+        haven't already been handed a ``preroll_d20``, publish a
+        ``roll.requested`` so the player gets the Foundry attack
+        dialog (with Dice So Nice animation), and skip the immediate
+        server-side resolution.
+
+        Returns ``True`` when the attack was deferred — the caller
+        must NOT also run ``action_resolver.resolve_intent`` for this
+        intent. :class:`PCAttackResolver` (subscribed to
+        ``roll.resolved``) finishes the attack when the d20 comes
+        back and re-runs the narration loop.
+
+        The synchronous path is kept for:
+          * NPC turns (controller != "player"),
+          * the Foundry "AI DM: Attack" macro (``ctx["origin"] == "macro"``),
+          * any caller that has already supplied a ``preroll_d20``
+            (typically the resumption hook itself).
+        """
+        if self.event_bus is None:
+            return False
+        if ctx.get("preroll_d20") is not None:
+            return False
+        if str(ctx.get("origin") or "").lower() == "macro":
+            return False
+
+        actor_id = intent.actor_id
+        target_id = intent.target_id
+        if not actor_id or not target_id:
+            return False
+
+        # Only defer for player-controlled attackers. Look up the
+        # combatant via the action resolver's actor_lookup so we agree
+        # with whatever the rules engine would resolve against.
+        attacker = None
+        try:
+            if self.action_resolver is not None and self.action_resolver.actor_lookup:
+                attacker = self.action_resolver.actor_lookup(actor_id)
+        except Exception:  # noqa: BLE001
+            attacker = None
+        if attacker is None:
+            return False
+        controller = str(getattr(attacker, "controller", "") or "").lower()
+        if controller and controller != "player":
+            return False
+
+        # Resolve the target so we can quote the AC on the dialog.
+        target = None
+        try:
+            if self.action_resolver is not None and self.action_resolver.actor_lookup:
+                target = self.action_resolver.actor_lookup(target_id)
+        except Exception:  # noqa: BLE001
+            target = None
+        target_ac = int(getattr(target, "ac", 0) or 0) or None
+        target_name = getattr(target, "name", None) or target_id
+
+        # Pre-compute attack mod so the dialog's bonus matches what the
+        # resolver will actually apply when the d20 returns.
+        weapon_obj = None
+        weapon_slug = getattr(intent, "weapon", None)
+        if weapon_slug:
+            try:
+                from ai_dm.rules import weapons as _wpn
+                weapon_obj = _wpn.get_weapon(str(weapon_slug))
+            except Exception:  # noqa: BLE001
+                weapon_obj = None
+        attack_mod = 0
+        try:
+            derived = self.action_resolver._derive_attack_bonus(  # noqa: SLF001
+                attacker, weapon_obj,
+            )
+            if derived is not None:
+                attack_mod = int(derived)
+        except Exception:  # noqa: BLE001
+            pass
+
+        formula = f"1d20{attack_mod:+d}" if attack_mod else "1d20"
+        prompt = f"Attack roll vs {target_name}"
+        if target_ac is not None:
+            prompt += f" (AC {target_ac})"
+
+        payload = {
+            "actor_id": actor_id,
+            "scene_id": ctx.get("scene_id") or self.default_scene_id,
+            "roll_type": "attack",
+            "key": str(weapon_slug) if weapon_slug else None,
+            "ac": target_ac,
+            "formula": formula,
+            "prompt_text": prompt,
+            "reason": f"attack {target_name}",
+            "correlation": {
+                "kind": "pc_attack",
+                "actor_id": actor_id,
+                "target_id": target_id,
+                "weapon": weapon_slug,
+                "scene_id": ctx.get("scene_id") or self.default_scene_id,
+                "user_id": ctx.get("user_id"),
+                "user_name": ctx.get("user_name"),
+                "actor_name": ctx.get("actor_name"),
+                "raw_text": getattr(intent, "raw_text", None),
+                # Forward overrides the resolver should respect when
+                # we resume (mostly for the macro path; harmless here).
+                "ctx_overrides": {
+                    k: ctx[k] for k in (
+                        "attack_modifier", "damage_dice", "damage_bonus",
+                        "damage_type", "two_handed",
+                    ) if k in ctx
+                },
+            },
+        }
+        try:
+            self.event_bus.publish("roll.requested", payload)
+            logger.info(
+                "attack deferred to player roll dialog: actor=%s target=%s "
+                "ac=%s mod=%+d",
+                actor_id, target_id, target_ac, attack_mod,
+            )
+            return True
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("defer_pc_attack publish failed: %s", exc)
+            return False
+
+    # ------------------------------------------------------------------ #
+
+    def _maybe_retarget_attack(self, intent: PlayerIntent, ctx: dict) -> None:
+        """Map a free-form ``target_id`` like ``"orc"`` / ``"Grukk"`` to
+        the actual participant's ``actor_id`` (e.g. ``"mon.grukk"``)
+        so the rules engine + the registry-backed lookup find the
+        right CombatantState. Falls back to "the only living foe" so
+        the swing still lands when the player typed a generic noun.
+        """
+        s = getattr(self.combat, "state", None) if self.combat is not None else None
+        if s is None or not s.participants:
+            logger.info(
+                "intent_router.retarget_attack: no live combat state; "
+                "leaving target_id=%r unchanged", intent.target_id,
+            )
+            return
+        target_text = (intent.target_id or intent.target_anchor or "").strip()
+        original_target = intent.target_id
+        if target_text:
+            norm = target_text.lower().lstrip("the ").strip()
+            for p in s.participants:
+                if p.actor_id == target_text:
+                    logger.info(
+                        "intent_router.retarget_attack: %r already matches "
+                        "participant.actor_id", target_text,
+                    )
+                    return  # already matches
+                names = {
+                    str(getattr(p, "actor_id", "") or "").lower(),
+                    str(getattr(p, "name", "") or "").lower(),
+                    str(getattr(p, "stat_block_key", "") or "").lower(),
+                }
+                if norm in names or any(norm and norm in n for n in names if n):
+                    intent.target_id = p.actor_id
+                    logger.info(
+                        "intent_router.retarget_attack: %r → participant "
+                        "actor_id=%r (name=%r)",
+                        target_text, p.actor_id, getattr(p, "name", None),
+                    )
+                    return
+        # Last-ditch fallback: a single living foe → use it.
+        actor_id = intent.actor_id
+        living_foes = [
+            p for p in s.participants
+            if getattr(p, "team", None) == "foe"
+            and int(getattr(p, "hp", 0) or 0) > 0
+            and p.actor_id != actor_id
+        ]
+        if len(living_foes) == 1:
+            intent.target_id = living_foes[0].actor_id
+            logger.info(
+                "intent_router.retarget_attack: fallback to sole living foe "
+                "%r (was target_id=%r)",
+                intent.target_id, original_target,
+            )
+        else:
+            logger.warning(
+                "intent_router.retarget_attack: could not match target=%r — "
+                "%d candidate living foe(s); leaving target_id=%r",
+                target_text, len(living_foes), intent.target_id,
+            )
+
+    # ------------------------------------------------------------------ #
+
     def _dispatch_move(self, intent: PlayerIntent, ctx: dict) -> bool:
+        # Defensive: lift "north 10 feet" / "10 ft north" out of
+        # ``target_anchor`` before any downstream code treats it as
+        # the name of a Foundry token / anchor pin.
+        intent = _normalise_directional_target(intent)
         scene_id = ctx.get("scene_id") or self.default_scene_id
         actor_id = intent.actor_id or ctx.get("actor_id")
         if not actor_id:
@@ -104,12 +415,45 @@ class IntentRouter:
             return False
         if not intent.target_anchor and not intent.target_id \
                 and not (getattr(intent, "extra", None)
-                         and intent.extra.get("x") is not None):
-            logger.warning(
-                "move intent skipped: no target_anchor/target_id/x "
-                "(raw=%r)", intent.raw_text,
-            )
-            return False
+                         and intent.extra.get("x") is not None) \
+                and not (intent.direction and intent.distance_ft):
+            # Cardinal-only phrasing ("head north", "go west") with no
+            # distance: try to resolve the direction as a travel exit
+            # on the current node first ("head north" → north exit →
+            # cross-scene travel). If no exit matches, fall back to
+            # an in-scene step of DEFAULT_MOVE_FT so the move still
+            # dispatches instead of being silently skipped.
+            if intent.direction and self.pack is not None:
+                dest_id, dest_label = self._resolve_travel_target(
+                    intent.direction, scene_id,
+                )
+                if dest_id and dest_id != scene_id:
+                    logger.info(
+                        "move(direction=%s) → travel reinterpretation: "
+                        "exit resolves to scene %s",
+                        intent.direction, dest_id,
+                    )
+                    travel_intent = intent.model_copy(update={
+                        "type": "travel",
+                        "verb": "travel",
+                        "target_id": dest_id,
+                        "target_anchor": dest_label or dest_id,
+                    })
+                    return self._dispatch_travel(travel_intent, ctx)
+            if intent.direction:
+                logger.info(
+                    "move: direction=%s with no distance — defaulting "
+                    "to %d ft", intent.direction, DEFAULT_MOVE_FT,
+                )
+                intent = intent.model_copy(update={
+                    "distance_ft": DEFAULT_MOVE_FT,
+                })
+            else:
+                logger.warning(
+                    "move intent skipped: no target_anchor/target_id/x "
+                    "and no direction+distance (raw=%r)", intent.raw_text,
+                )
+                return False
 
         # Cross-scene fast-path: if the target resolves to a known
         # travel destination (cardinal exit on the current node, or a
@@ -543,6 +887,244 @@ class IntentRouter:
         except Exception as exc:  # noqa: BLE001
             logger.warning("highlight dispatch failed: %s", exc)
             return False
+
+    # ------------------------------------------------------------------ #
+    # Authored-interaction → roll request fallback
+    # ------------------------------------------------------------------ #
+
+    # Loose verb-keyword aliases so a free-form player utterance like
+    # "I pray at the altar" still matches an authored interaction whose
+    # canonical verb is `pray`. Keys are normalised lower-case substrings
+    # we look for in the player's verb / raw text; values are the
+    # canonical authored verb tokens.
+    _VERB_ALIASES: dict[str, tuple[str, ...]] = {
+        "pray": ("pray", "kneel", "worship", "supplicate", "petition"),
+        "search": ("search", "look", "examine", "investigate", "rummage", "inspect"),
+        "read": ("read", "study", "decipher"),
+        "open": ("open", "unlock", "force", "pry", "break"),
+        "climb": ("climb", "scale", "ascend"),
+        "hide": ("hide", "sneak"),
+        "listen": ("listen", "eavesdrop"),
+        "talk": ("talk", "speak", "ask", "greet", "convince", "persuade"),
+        "join_service": ("join_service", "attend", "participate", "join"),
+    }
+
+    def _maybe_request_authored_roll(
+        self, intent: PlayerIntent, ctx: dict,
+    ) -> None:
+        """If ``intent`` targets an authored interactable that carries a
+        ``check`` + ``dc``, publish a ``roll.requested`` event so the
+        :class:`RollRequestDispatcher` fires regardless of whether the
+        LLM remembered to emit a structured ``DiceRequest``.
+
+        No-op when the pack is unavailable, the target can't be matched,
+        or the matched interaction has no mechanical fields.
+        """
+        if self.pack is None or self.event_bus is None:
+            return
+        target_text = (intent.target_anchor or intent.target_id or "").strip()
+        if not target_text:
+            return
+        scene_id = ctx.get("scene_id") or self.default_scene_id
+        if not scene_id:
+            return
+
+        feature = self._find_authored_interactable(scene_id, target_text)
+        if feature is None:
+            return
+        interactions = feature.get("interactions") or []
+        if not isinstance(interactions, list) or not interactions:
+            return
+        match = self._match_interaction(interactions, intent)
+        if match is None:
+            return
+        check = match.get("check")
+        dc = match.get("dc")
+        if not check or dc is None:
+            return
+
+        roll_type, skill = self._parse_check_string(str(check))
+        if not skill:
+            return
+
+        actor_id = intent.actor_id or ctx.get("actor_id")
+        feature_label = feature.get("name") or feature.get("id") or target_text
+        verb_label = match.get("verb") or intent.verb or "interact"
+        reason = (
+            match.get("summary")
+            or f"{verb_label} {feature_label}".strip()
+        )
+        payload = {
+            "actor_id": actor_id,
+            "scene_id": scene_id,
+            "roll_type": roll_type,
+            "key": skill,
+            "dc": int(dc) if isinstance(dc, (int, float, str)) and str(dc).lstrip("-").isdigit() else dc,
+            "reason": reason,
+            "prompt_text": f"Make a {skill.title()} check (DC {dc}) — {reason}",
+            "correlation": {
+                "source": "intent_router.authored_interaction",
+                "feature": feature_label,
+                "verb": verb_label,
+                # Forward the authored consequence text so the
+                # follow-up narration turn (synthesised by
+                # RollRequestDispatcher._enqueue_followup) can quote
+                # or paraphrase it. Without these the LLM sees only
+                # "[roll-result] skill/religion = 17 → success" and
+                # has no idea what success at the *altar* should look
+                # like.
+                "summary": match.get("summary"),
+                "on_success": match.get("on_success"),
+                "on_failure": match.get("on_failure") or match.get("on_fail"),
+                "grants": match.get("grants"),
+                "starts_encounter": match.get("starts_encounter"),
+                "ends_encounter": match.get("ends_encounter"),
+                "ends_scene": match.get("ends_scene"),
+                "xp": match.get("xp"),
+                "raw_text": intent.raw_text,
+            },
+        }
+        logger.info(
+            "interact: authored check on %r/%s → roll.requested skill=%s dc=%s",
+            feature_label, verb_label, skill, dc,
+        )
+        try:
+            self.event_bus.publish("roll.requested", payload)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("publish roll.requested failed: %s", exc)
+
+    def _find_authored_interactable(
+        self, scene_id: str, target_text: str,
+    ) -> dict | None:
+        """Best-effort lookup of the authored feature/anchor/NPC the
+        player is interacting with. Returns the raw dict (with its
+        ``interactions`` list) or ``None``.
+        """
+        try:
+            from ai_dm.app.opening_scene import (
+                find_scene_anchors,
+                find_scene_node,
+                find_scene_npcs,
+            )
+        except Exception:  # noqa: BLE001
+            return None
+
+        norm = target_text.strip().lower()
+        if not norm:
+            return None
+
+        def _matches(name: str | None, fid: str | None) -> bool:
+            for v in (name, fid):
+                if not v:
+                    continue
+                v_norm = str(v).strip().lower().replace("_", " ")
+                if v_norm == norm or norm in v_norm or v_norm in norm:
+                    return True
+            return False
+
+        # 1. Node features (the primary authoring location for things
+        # like an altar with `interactions: [{verb: "pray", ...}]`).
+        node = find_scene_node(self.pack, scene_id)
+        for feat in (node or {}).get("features", []) or []:
+            if not isinstance(feat, dict):
+                continue
+            if _matches(feat.get("name"), feat.get("id")):
+                return feat
+
+        # 2. Scene anchors (some packs author interactions on anchors
+        # rather than node features).
+        try:
+            anchors = find_scene_anchors(self.pack, scene_id)
+        except Exception:  # noqa: BLE001
+            anchors = []
+        for a in anchors or []:
+            if isinstance(a, dict) and _matches(a.get("name"), a.get("id")):
+                return a
+
+        # 3. NPCs (e.g. "ask Old Beren" / "intimidate the cultist").
+        try:
+            npcs = find_scene_npcs(self.pack, scene_id)
+        except Exception:  # noqa: BLE001
+            npcs = []
+        for npc in npcs or []:
+            if isinstance(npc, dict) and _matches(npc.get("name"), npc.get("id")):
+                return npc
+        return None
+
+    def _match_interaction(
+        self, interactions: list, intent: PlayerIntent,
+    ) -> dict | None:
+        """Pick the authored interaction whose ``verb`` best matches the
+        player's intent. Falls back to a single-entry list (the only
+        authored option) when no verb info is available.
+        """
+        verb_norm = (intent.verb or "").strip().lower()
+        raw_norm = (intent.raw_text or "").strip().lower()
+
+        def _verb_of(ix: dict) -> str:
+            return str(ix.get("verb") or "").strip().lower()
+
+        # Exact verb match.
+        if verb_norm:
+            for ix in interactions:
+                if isinstance(ix, dict) and _verb_of(ix) == verb_norm:
+                    return ix
+
+        # Alias match (player verb or raw text contains an alias for the
+        # authored verb).
+        for ix in interactions:
+            if not isinstance(ix, dict):
+                continue
+            authored = _verb_of(ix)
+            aliases = self._VERB_ALIASES.get(authored, (authored,))
+            for alias in aliases:
+                if not alias:
+                    continue
+                if alias == verb_norm or (raw_norm and alias in raw_norm):
+                    return ix
+
+        # Single authored option → use it (avoids silently dropping a
+        # check when the player phrased the verb unusually but there's
+        # only one thing they could mean).
+        well_shaped = [ix for ix in interactions if isinstance(ix, dict) and ix.get("verb")]
+        if len(well_shaped) == 1:
+            return well_shaped[0]
+        return None
+
+    @staticmethod
+    def _parse_check_string(check: str) -> tuple[str, str | None]:
+        """Translate authored ``check`` strings to (roll_type, key).
+
+        Examples:
+            ``"int.religion"``  -> ("skill", "religion")
+            ``"wis.perception"`` -> ("skill", "perception")
+            ``"dex"``           -> ("ability", "dex")
+            ``"str.save"``      -> ("save", "str")
+            ``"con_save"``      -> ("save", "con")
+        """
+        s = (check or "").strip().lower()
+        if not s:
+            return ("skill", None)
+        # Save shapes: "str_save", "save:dex", "dex.save".
+        if "save" in s:
+            for tok in s.replace(":", ".").replace("_", ".").split("."):
+                if tok in {"str", "dex", "con", "int", "wis", "cha"}:
+                    return ("save", tok)
+            return ("save", None)
+        # "ability.skill" pair → skill check.
+        if "." in s:
+            ability, _, skill = s.partition(".")
+            ability = ability.strip()
+            skill = skill.strip()
+            if skill:
+                return ("skill", skill)
+            if ability in {"str", "dex", "con", "int", "wis", "cha"}:
+                return ("ability", ability)
+        # Bare ability key → ability check.
+        if s in {"str", "dex", "con", "int", "wis", "cha"}:
+            return ("ability", s)
+        # Bare skill name.
+        return ("skill", s)
 
     def _dispatch_travel(self, intent: PlayerIntent, ctx: dict) -> bool:
         """Cross-scene travel: resolve the destination to a scene id,

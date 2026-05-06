@@ -108,6 +108,44 @@ class PartyState(BaseModel):
         self.pending_xp = 0
         return per
 
+    def award_story_xp(
+        self,
+        amount: int,
+        *,
+        source: str | None = None,
+        scene_id: str | None = None,
+    ) -> dict[str, int]:
+        """Award a flat block of *story* XP outside the combat loop.
+
+        Used by :class:`ai_dm.orchestration.xp_awarder.XPAwarder` when a
+        player succeeds at an authored interaction that carries an
+        ``xp:`` field. Splits ``amount`` evenly across living members
+        via :func:`ai_dm.rules.xp_budget.award_xp`, updates ``xp_pool``
+        + ``levels`` immediately (no encounter-bound staging), and
+        appends an :class:`XPAward` log entry tagged with ``source``.
+
+        No-op (returns ``{}``) when there are no members or
+        ``amount <= 0``.
+        """
+        amt = int(amount or 0)
+        if not self.members or amt <= 0:
+            return {}
+        per = xp_budget.award_xp(self.members, amt)
+        for actor_id, delta in per.items():
+            new_total = self.xp_pool.get(actor_id, 0) + int(delta)
+            self.xp_pool[actor_id] = new_total
+            self.levels[actor_id] = max(
+                self.levels.get(actor_id, 1),
+                xp_budget.level_for_xp(new_total),
+            )
+        even = amt // len(self.members)
+        self.xp_log.append(XPAward(
+            encounter_id=source,
+            raw_xp=amt,
+            awarded_per_member=even,
+        ))
+        return per
+
     def level_up_pending(self, actor_id: str) -> bool:
         """``True`` if ``actor_id``'s XP exceeds the threshold for their
         current level + 1 (i.e. UI should prompt a level-up)."""

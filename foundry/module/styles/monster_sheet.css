@@ -1,0 +1,144 @@
+/* AI-DM lightweight monster sheet */
+
+.ai-dm-monster-sheet-app .window-content {
+    padding: 0;
+}
+
+.ai-dm-monster-sheet {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 12px 12px;
+    font-family: var(--font-primary, sans-serif);
+    color: var(--color-text-dark-primary, #1c1c1c);
+}
+
+.ai-dm-monster-header {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.ai-dm-monster-portrait {
+    width: 56px;
+    height: 56px;
+    border-radius: 4px;
+    object-fit: cover;
+    border: 1px solid var(--color-border-dark, #6c6c6c);
+    background: #2b2b2b;
+    flex: 0 0 auto;
+}
+
+.ai-dm-monster-title {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.ai-dm-monster-name {
+    margin: 0;
+    font-size: 1.15em;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ai-dm-monster-subtitle {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.ai-dm-monster-subtitle .tag {
+    font-size: 0.75em;
+    text-transform: capitalize;
+    padding: 1px 6px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.08);
+    color: var(--color-text-dark-secondary, #444);
+    border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.ai-dm-monster-subtitle .tag.muted {
+    opacity: 0.7;
+    font-style: italic;
+}
+
+.ai-dm-monster-stats {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.ai-dm-monster-stats .row {
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    align-items: center;
+    gap: 8px;
+}
+
+.ai-dm-monster-stats dt {
+    font-weight: 600;
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-text-dark-secondary, #555);
+    margin: 0;
+}
+
+.ai-dm-monster-stats dd {
+    margin: 0;
+    font-size: 0.95em;
+}
+
+.ai-dm-hp-bar {
+    position: relative;
+    height: 18px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.12);
+    overflow: hidden;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.ai-dm-hp-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: linear-gradient(90deg, #b00020, #d33d3d);
+    transition: width 0.2s ease-out;
+}
+
+.ai-dm-hp-label {
+    position: relative;
+    display: block;
+    text-align: center;
+    font-size: 0.8em;
+    line-height: 18px;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
+    font-variant-numeric: tabular-nums;
+}
+
+.ai-dm-monster-stats .muted {
+    color: var(--color-text-dark-secondary, #666);
+    font-size: 0.85em;
+}
+
+.ai-dm-monster-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 4px;
+}
+
+.ai-dm-monster-footer .ai-dm-monster-close {
+    padding: 4px 10px;
+    font-size: 0.85em;
+}
+
+/* Token HUD button */
+.control-icon.ai-dm-monster-hud {
+    color: #f6c44e;
+}
+

@@ -154,12 +154,104 @@ class ActionResolver:
             )
         attacker = self._lookup(actor_id) or ActorRuleState(actor_id=actor_id, name=actor_id)
         target = self._lookup(target_id) or ActorRuleState(actor_id=target_id, name=target_id)
+        # Stub fallback hides bugs #1 (HP doesn't change) and #2
+        # (to-hit is 0): if either side is a fresh ActorRuleState
+        # (instead of the live CombatantState in
+        # ``combat.state.participants``) the attack rolls vs. nothing
+        # and the damage lands on a throwaway object. Surface that
+        # explicitly so we can see it in the console.
+        attacker_real = self._lookup(actor_id) is not None
+        target_real = self._lookup(target_id) is not None
+        if not attacker_real or not target_real:
+            logger.warning(
+                "npc_turn: action_resolver fell back to STUB — "
+                "attacker_id=%r real=%s, target_id=%r real=%s "
+                "(actor_lookup=%s). Likely no encounter is live OR the "
+                "Foundry id doesn't match any participant.actor_id / "
+                "token_id. Damage will NOT persist.",
+                actor_id, attacker_real, target_id, target_real,
+                "set" if self.actor_lookup else "None",
+            )
+        logger.info(
+            "action_resolver.attack: %s (hp=%s/%s) → %s (hp=%s/%s ac=%s)",
+            getattr(attacker, "actor_id", actor_id),
+            getattr(attacker, "hp", None), getattr(attacker, "max_hp", None),
+            getattr(target, "actor_id", target_id),
+            getattr(target, "hp", None), getattr(target, "max_hp", None),
+            getattr(target, "ac", None),
+        )
+        # ``ctx`` carries explicit overrides only — distinguish "absent"
+        # from "explicit 0" so the weapon-derived bonus wins when the
+        # caller (e.g. the Foundry attack macro) didn't precompute one.
+        ctx_has_attack_mod = "attack_modifier" in ctx
+        ctx_has_damage_bonus = "damage_bonus" in ctx
         attack_mod = int(ctx.get("attack_modifier", 0))
         damage_dice = str(ctx.get("damage_dice", "1d6"))
         damage_bonus = int(ctx.get("damage_bonus", 0))
         damage_type = str(ctx.get("damage_type", "slashing"))
 
-        atk = self.rules.attack(attacker, target, attack_modifier=attack_mod)
+        # Weapon resolution: when the player picked a specific weapon
+        # (Foundry "AI DM: Attack" macro), look it up in the SRD
+        # catalog and override the ctx defaults. Falls back to the
+        # generic 1d6 slashing if the slug is unknown so the strike
+        # still resolves.
+        weapon_slug = getattr(intent, "weapon", None)
+        weapon_obj = None
+        if weapon_slug:
+            try:
+                from ai_dm.rules import weapons as _wpn
+                weapon_obj = _wpn.get_weapon(str(weapon_slug))
+                if weapon_obj is not None:
+                    two_handed = bool(ctx.get("two_handed", False))
+                    dice, dtype = _wpn.damage_for(weapon_obj, two_handed=two_handed)
+                    if dice:
+                        damage_dice = dice
+                    if dtype:
+                        damage_type = dtype
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("weapon lookup failed for %r: %s", weapon_slug, exc)
+
+        # Derive ability + proficiency mods from the attacker's
+        # CombatantState. Even when the weapon slug is unknown (or the
+        # actor is unarmed) we still want to honour STR/DEX + prof
+        # rather than silently rolling a flat d20.
+        if not ctx_has_attack_mod:
+            derived_atk = self._derive_attack_bonus(attacker, weapon_obj)
+            if derived_atk is not None:
+                attack_mod = derived_atk
+            # Magical weapon +N (Inventory bookkeeping; safe no-op on
+            # ActorRuleState stubs).
+            inv = getattr(attacker, "inventory", None)
+            if inv is not None and hasattr(inv, "equipped_weapon_bonus"):
+                try:
+                    attack_mod += int(inv.equipped_weapon_bonus("main_hand"))
+                except Exception:  # noqa: BLE001
+                    pass
+        if not ctx_has_damage_bonus:
+            ab = self._ability_mod_for_weapon(attacker, weapon_obj)
+            if ab is not None:
+                damage_bonus = ab
+            inv = getattr(attacker, "inventory", None)
+            if inv is not None and hasattr(inv, "equipped_weapon_bonus"):
+                try:
+                    damage_bonus += int(inv.equipped_weapon_bonus("main_hand"))
+                except Exception:  # noqa: BLE001
+                    pass
+
+        # Unarmed strike default damage when no weapon was supplied.
+        if weapon_slug is None and not ctx.get("damage_dice"):
+            damage_dice = "1d4"
+            damage_type = "bludgeoning"
+
+        atk = self.rules.attack(
+            attacker, target,
+            attack_modifier=attack_mod,
+            preroll_d20=ctx.get("preroll_d20"),
+        )
+        logger.info(
+            "action_resolver.attack: roll → hit=%s crit=%s (attack_mod=%d, target_ac=%s)",
+            atk.hit, atk.crit, attack_mod, getattr(target, "ac", None),
+        )
         damage_total = 0
         damage_details: dict | None = None
         if atk.hit:
@@ -172,7 +264,10 @@ class ActionResolver:
             )
             damage_total = dmg.total
             damage_details = dmg.to_dict()
-            self.rules.apply_damage(target, dmg.total)
+            self.rules.apply_damage(
+                target, dmg.total,
+                damage_type=damage_type, crit=atk.crit,
+            )
         # An attack consumes the actor's action and breaks stealth.
         self._consume_economy(attacker, action=True)
         _set_attr(attacker, "hidden", False)
@@ -470,3 +565,52 @@ class ActionResolver:
         except Exception as exc:  # noqa: BLE001
             logger.warning("actor lookup failed for %s: %s", actor_id, exc)
             return None
+
+    # ------------------------------------------------------------------ #
+    # Weapon helpers (best-effort — silently no-op on legacy stubs)
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _ability_mod_for_weapon(attacker: Any, weapon: Any) -> int | None:
+        """Return STR mod for melee, DEX mod for ranged or finesse
+        when DEX > STR, looking up :class:`CombatantState.ability_mods`.
+
+        Returns ``0`` (not ``None``) when the attacker exposes
+        ``ability_mods`` but the relevant key is missing — bare
+        :class:`ActorRuleState` stubs (no ``ability_mods`` attribute at
+        all) still return ``None`` so the caller keeps whatever
+        ``ctx`` supplied.
+        """
+        if not hasattr(attacker, "ability_mods"):
+            return None
+        mods = getattr(attacker, "ability_mods", None) or {}
+        if not isinstance(mods, dict):
+            return None
+        try:
+            from ai_dm.rules import weapons as _wpn
+            ranged = _wpn.is_ranged(weapon) if weapon is not None else False
+            finesse = _wpn.is_finesse(weapon) if weapon is not None else False
+        except Exception:  # noqa: BLE001
+            ranged = False
+            finesse = False
+        str_mod = int(mods.get("str", 0) or 0)
+        dex_mod = int(mods.get("dex", 0) or 0)
+        if ranged:
+            return dex_mod
+        if finesse:
+            return max(str_mod, dex_mod)
+        return str_mod
+
+    def _derive_attack_bonus(self, attacker: Any, weapon: Any) -> int | None:
+        """Best-effort attack bonus = ability_mod + proficiency_bonus.
+
+        Returns ``None`` only when the attacker has no ``ability_mods``
+        attribute at all (legacy :class:`ActorRuleState` stubs); an
+        empty-but-present dict still yields ``0 + proficiency_bonus``.
+        """
+        ab = self._ability_mod_for_weapon(attacker, weapon)
+        if ab is None:
+            return None
+        prof = int(getattr(attacker, "proficiency_bonus", 0) or 0)
+        return ab + prof
+

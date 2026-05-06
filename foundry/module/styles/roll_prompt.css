@@ -1,0 +1,166 @@
+/* AI DM — roll prompt + DM roll chat cards. */
+
+.aidm-roll-card {
+  border: 1px solid #6b5b95;
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin: 2px 0;
+  background: rgba(107, 91, 149, 0.08);
+}
+
+.aidm-roll-card .aidm-roll-actor {
+  font-size: 0.95em;
+  margin-bottom: 2px;
+}
+
+.aidm-roll-card .aidm-roll-tag {
+  color: #777;
+  font-size: 0.85em;
+  font-weight: normal;
+}
+
+.aidm-roll-card .aidm-roll-prompt {
+  margin-bottom: 6px;
+  font-style: italic;
+}
+
+.aidm-roll-card .aidm-roll-dc {
+  font-weight: bold;
+  color: #b04020;
+}
+
+.aidm-roll-card .aidm-roll-adv  { color: #2a8033; font-weight: bold; }
+.aidm-roll-card .aidm-roll-dis  { color: #b03030; font-weight: bold; }
+
+.aidm-roll-card button.aidm-roll-btn {
+  width: 100%;
+  padding: 6px;
+  font-size: 1.0em;
+  font-weight: bold;
+  background: #6b5b95;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.aidm-roll-card button.aidm-roll-btn:hover {
+  background: #543f7d;
+}
+
+.aidm-roll-card .aidm-roll-done {
+  text-align: center;
+  padding: 4px;
+  background: rgba(107, 91, 149, 0.18);
+  border-radius: 4px;
+  font-size: 0.95em;
+}
+
+.aidm-roll-card.aidm-dmroll-card {
+  border-color: #5c5c5c;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.aidm-roll-card .aidm-roll-result {
+  margin: 2px 0;
+}
+
+.aidm-roll-card .aidm-roll-result code {
+  background: rgba(0, 0, 0, 0.08);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.aidm-roll-card .aidm-roll-dice {
+  font-size: 0.85em;
+  color: #555;
+  margin-left: 6px;
+}
+
+.aidm-roll-card .aidm-roll-outcome {
+  font-size: 0.9em;
+  margin-top: 2px;
+}
+
+.aidm-roll-card .aidm-roll-reason {
+  font-size: 0.85em;
+  color: #666;
+  font-style: italic;
+  margin-top: 2px;
+}
+
+/* ----- Pending Rolls tray (sticky window) ----- */
+
+.ai-dm-pending-rolls .ai-dm-pending-rolls-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.ai-dm-pending-rolls .ai-dm-pending-rolls-empty {
+  padding: 10px;
+  font-size: 0.9em;
+  color: #666;
+  text-align: center;
+}
+
+.aidm-tray-card {
+  border: 1px solid #6b5b95;
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: rgba(107, 91, 149, 0.10);
+  animation: aidm-tray-pulse 1.4s ease-in-out 0s 3;
+}
+
+@keyframes aidm-tray-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(107, 91, 149, 0.0); }
+  50%      { box-shadow: 0 0 0 4px rgba(107, 91, 149, 0.35); }
+}
+
+.aidm-tray-card .aidm-tray-actor {
+  font-size: 0.95em;
+  margin-bottom: 2px;
+}
+
+.aidm-tray-card .aidm-tray-tag {
+  color: #777;
+  font-size: 0.8em;
+  margin-left: 4px;
+}
+
+.aidm-tray-card .aidm-tray-prompt {
+  margin: 4px 0;
+  font-style: italic;
+  font-size: 0.92em;
+}
+
+.aidm-tray-card .aidm-tray-dc {
+  font-weight: bold;
+  color: #b04020;
+}
+
+.aidm-tray-card .aidm-tray-adv { color: #2a8033; font-weight: bold; }
+.aidm-tray-card .aidm-tray-dis { color: #b03030; font-weight: bold; }
+
+.aidm-tray-card button.aidm-tray-roll-btn {
+  width: 100%;
+  padding: 6px;
+  font-weight: bold;
+  background: #6b5b95;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.aidm-tray-card button.aidm-tray-roll-btn:hover {
+  background: #543f7d;
+}
+
+.aidm-tray-card button.aidm-tray-roll-btn:disabled {
+  background: #999;
+  cursor: progress;
+}

@@ -77,8 +77,16 @@ def build_runtime(settings: Settings | None = None) -> Runtime:
     _seed_ai_companions(pack)
     audio_enabled = _env_bool("AI_DM_AUDIO", default=True)
     edge_voice = os.environ.get("TTS_VOICE") or "en-GB-SoniaNeural"
+    rolls_cfg = (settings.raw.get("rolls") or {}) if settings else {}
     container = Container.build(
-        ContainerConfig(pack=pack, audio_enabled=audio_enabled, edge_voice=edge_voice)
+        ContainerConfig(
+            pack=pack,
+            audio_enabled=audio_enabled,
+            edge_voice=edge_voice,
+            rolls_enabled=bool(rolls_cfg.get("enabled", True)),
+            rolls_timeout_s=float(rolls_cfg.get("timeout_s", 30.0)),
+            rolls_on_timeout=str(rolls_cfg.get("on_timeout", "auto_roll")),
+        )
     )
 
     # Character creation now happens *after* the container is built so
@@ -142,6 +150,7 @@ def build_runtime(settings: Settings | None = None) -> Runtime:
         intent_parser=container.intent_parser,
         intent_router=container.intent_router,
         event_bus=container.event_bus,  # publishes narrator.output_ready
+        roll_request_dispatcher=getattr(container, "roll_request_dispatcher", None),
     )
     # Wire the chat-driven dispatcher to the freshly built Director so
     # ``/act <text>`` from Foundry chat runs the same turn pipeline as
@@ -341,25 +350,14 @@ def _emit_opening_narration(
     except Exception as exc:  # noqa: BLE001
         logger.warning("opening narration send failed: %s", exc)
 
-    # Also publish on the in-process bus so the audio dispatcher reads
-    # the opening aloud through TTS. Prose already weaves interactables
-    # and exits into the narrative (see opening_scene._compose_prose),
-    # so we just speak the narration verbatim — no extra list sentence.
-    if container.event_bus is not None:
-        spoken = (envelope.get("narration") or "").strip()
-        if spoken:
-            try:
-                container.event_bus.publish(
-                    "narrator.output_ready",
-                    {
-                        "narration": spoken,
-                        "dialogue": [],
-                        "source": "opening",
-                        "scene_id": scene_id,
-                    },
-                )
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("opening narrator.output_ready publish failed: %s", exc)
+    # NOTE: we deliberately do NOT republish the opening on
+    # ``narrator.output_ready`` here. Packs that author a
+    # ``scene.entered`` trigger (e.g. ``start_intro``) with a ``speak``
+    # action provide their own spoken intro through the TTS dispatcher;
+    # publishing the deterministic envelope's narration here as well
+    # made the player hear two openings back-to-back at startup. The
+    # chat envelope above (sent via the ``narration`` event) is the
+    # canonical visible opening; audio is owned by the authored trigger.
 
 
 def _join_human(names: list[str]) -> str:

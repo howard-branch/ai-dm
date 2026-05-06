@@ -64,13 +64,51 @@ def speak(narration_bus, text: str, voice: str | None = None) -> Action:
     return _a
 
 
-def start_encounter(combat, encounter_id: str, participants: list[dict]) -> Action:
+def start_encounter(
+    combat,
+    encounter_id: str,
+    participants: list[dict],
+    *,
+    turn_manager=None,
+    encounter_manager=None,
+) -> Action:
+    """Start an authored encounter.
+
+    Prefers ``encounter_manager.start_encounter(encounter_id)`` when
+    wired so the participants are hydrated from the chapter record
+    (Grukk's stat block, party PCs, etc.) instead of being passed
+    through verbatim — the trigger DSL's ``[{actor_id, side}]`` shape
+    cannot satisfy ``CombatantState`` (``name`` is required, ``side``
+    is forbidden), which silently swallowed every authored
+    ``start_encounter`` and left combat un-initialised.
+
+    The legacy raw path is kept as a fallback so unit tests that wire
+    a bare CombatMachine continue to work.
+    """
+
     def _a(_payload: dict, _ctx: dict) -> None:
         try:
+            if encounter_manager is not None:
+                ok = encounter_manager.start_encounter(
+                    encounter_id, reason="trigger",
+                )
+                if not ok:
+                    logger.warning(
+                        "trigger start_encounter(%s): encounter_manager"
+                        " returned False",
+                        encounter_id,
+                    )
+                return
             combat.start_encounter(encounter_id, participants)
-            combat.roll_initiative()
+            if turn_manager is not None:
+                turn_manager.kickoff()
+            else:
+                combat.roll_initiative()
         except Exception as exc:  # noqa: BLE001
-            logger.warning("trigger start_encounter failed: %s", exc)
+            logger.exception(
+                "trigger start_encounter(%s) failed: %s",
+                encounter_id, exc,
+            )
 
     return _a
 
@@ -261,7 +299,13 @@ def from_spec(spec: dict, *, deps: dict) -> Action:
     if op == "speak":
         return speak(deps["event_bus"], args["text"], args.get("voice"))
     if op == "start_encounter":
-        return start_encounter(deps["combat"], args["encounter_id"], args.get("participants", []))
+        return start_encounter(
+            deps["combat"],
+            args["encounter_id"],
+            args.get("participants", []),
+            turn_manager=deps.get("turn_manager"),
+            encounter_manager=deps.get("encounter_manager"),
+        )
     if op == "advance_time":
         return advance_time(
             deps.get("clock"),

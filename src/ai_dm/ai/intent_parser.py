@@ -80,6 +80,24 @@ _MOVE_DIST_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Reversed phrasing: "move north 10 feet", "go south 20ft", "head west 5'".
+# Players say this as often as the distance-first form, but the
+# distance-first regex above can't match it; without this variant the
+# tail "north 10 feet" would fall through to ``_MOVE_RE`` and be
+# captured verbatim as ``target_anchor`` — which then gets shipped to
+# Foundry as ``move_actor_to "north 10 feet"`` and fails with
+# "target not found on scene".
+_MOVE_DIR_DIST_RE = re.compile(
+    r"^\s*(?:i\s+)?"
+    r"(?:move|advance|step|walk|run|head|go|sprint|dash|fall\s+back|back\s+up|"
+    r"retreat|withdraw)"
+    r"(?:\s+back)?"
+    r"\s+(?P<cardinal>" + _DIRECTION_TOKENS + r")"
+    r"\s+(?P<dist>\d{1,3})\s*(?:ft|feet|foot|')"
+    r"\s*[.!?]*$",
+    re.IGNORECASE,
+)
+
 # Party-scope detection. Players phrase whole-party moves a dozen
 # different ways: "move whole party to the brink", "take everyone to
 # the chapel", "we all head north", "let's go to the door". When any
@@ -354,7 +372,30 @@ class IntentParser:
 
         # Partial / directional move (matched before the generic
         # _MOVE_RE so "move 30 feet toward altar" doesn't collapse
-        # into target_anchor="30 feet toward altar").
+        # into target_anchor="30 feet toward altar"). Try the
+        # direction-first phrasing ("move north 10 feet") first so
+        # the cardinal token isn't swallowed by the generic anchor
+        # group of _MOVE_RE.
+        m = _MOVE_DIR_DIST_RE.match(text)
+        if m:
+            try:
+                dist = int(m.group("dist"))
+            except (TypeError, ValueError):
+                dist = None
+            cardinal = (m.group("cardinal") or "").lower() or None
+            return PlayerIntent(
+                type="move",
+                verb="move",
+                actor_id=self.default_actor_id,
+                target_anchor=None,
+                distance_ft=dist,
+                direction=cardinal,
+                raw_text=text,
+                confidence=0.9,
+                extra=({"party_scope": True}
+                       if _PARTY_SCOPE_RE.search(text) else {}),
+            )
+
         m = _MOVE_DIST_RE.match(text)
         if m:
             try:

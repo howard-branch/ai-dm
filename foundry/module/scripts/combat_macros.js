@@ -18,13 +18,88 @@ const actor = token?.actor || game.user.character;
 if (!actor) return ui.notifications?.warn("Select your token first.");
 const target = game.user.targets.first();
 if (!target) return ui.notifications?.warn("Target an enemy (T).");
-sendStructuredIntent({
-  type: "attack",
-  actor_id: actor.id,
-  target_id: target.actor?.id ?? target.id,
-  scene_id: canvas?.scene?.id ?? null,
-  user_id: game.user.id,
-});
+
+// Enumerate equipped weapons (dnd5e). Fall back to ALL weapons in
+// inventory when nothing is flagged equipped (older sheets / NPCs).
+const items = actor.items?.contents ?? [];
+const weapons = items.filter((i) => i.type === "weapon");
+const equipped = weapons.filter((w) => w.system?.equipped);
+const choices = (equipped.length ? equipped : weapons);
+
+function _slug(w) {
+  // Prefer the 5e identifier (matches our SRD weapons.json keys), then
+  // fall back to a normalised name slug.
+  return (w.system?.identifier
+          || (w.name || "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, ""))
+         || "weapon";
+}
+
+function _send(weaponSlug, twoHanded) {
+  sendStructuredIntent({
+    type: "attack",
+    actor_id: actor.id,
+    target_id: target.actor?.id ?? target.id,
+    weapon: weaponSlug,
+    two_handed: !!twoHanded,
+    scene_id: canvas?.scene?.id ?? null,
+    user_id: game.user.id,
+  });
+}
+
+if (choices.length === 0) {
+  ui.notifications?.warn("No weapons in inventory — using unarmed strike.");
+  _send(null, false);
+  return;
+}
+
+if (choices.length === 1) {
+  const w = choices[0];
+  const versatile = (w.system?.properties?.ver) || (w.system?.damage?.versatile);
+  // Auto-pick when only one option; surface a versatile two-handed
+  // toggle if the weapon supports it.
+  if (versatile) {
+    new Dialog({
+      title: \`Attack with \${w.name}\`,
+      content: \`<p>\${w.name} (versatile). One-handed or two-handed?</p>\`,
+      buttons: {
+        one:  { label: "One-handed", callback: () => _send(_slug(w), false) },
+        two:  { label: "Two-handed", callback: () => _send(_slug(w), true) },
+      },
+      default: "one",
+    }).render(true);
+  } else {
+    _send(_slug(w), false);
+  }
+  return;
+}
+
+const opts = choices.map((w, i) =>
+  \`<option value="\${i}">\${w.name}\${w.system?.equipped ? "" : " (carried)"}</option>\`
+).join("");
+new Dialog({
+  title: "Attack — choose a weapon",
+  content: \`<form>
+    <div class="form-group"><label>Weapon</label>
+      <select name="w">\${opts}</select>
+    </div>
+    <div class="form-group">
+      <label><input type="checkbox" name="th" /> Two-handed (versatile)</label>
+    </div>
+  </form>\`,
+  buttons: {
+    go: {
+      label: "Strike",
+      callback: (html) => {
+        const idx = Number(html.find('select[name="w"]').val() || 0);
+        const th = !!html.find('input[name="th"]').is(":checked");
+        const w = choices[idx] || choices[0];
+        _send(_slug(w), th);
+      },
+    },
+    cancel: { label: "Cancel" },
+  },
+  default: "go",
+}).render(true);
 `.trim(),
   },
   {

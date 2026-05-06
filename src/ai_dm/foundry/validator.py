@@ -13,6 +13,7 @@ machine-readable ``code`` and the offending ``field``.
 """
 from __future__ import annotations
 
+import logging
 from typing import Any, Iterable
 
 from pydantic import TypeAdapter, ValidationError as PydanticValidationError
@@ -21,6 +22,7 @@ from ai_dm.foundry.errors import RegistryMissError, ValidationError
 from ai_dm.foundry.registry import FoundryRegistry
 from ai_dm.models.commands import (
     ActivateSceneCommand,
+    ApplyDamageCommand,
     CreateActorCommand,
     CreateJournalCommand,
     CreateNoteCommand,
@@ -29,6 +31,7 @@ from ai_dm.models.commands import (
     DeleteSceneCommand,
     DeleteTokenCommand,
     GameCommand,
+    GiveItemCommand,
     HighlightObjectCommand,
     MoveTokenCommand,
     MoveActorToCommand,
@@ -40,6 +43,8 @@ from ai_dm.models.commands import (
     UpdateJournalCommand,
 )
 
+logger = logging.getLogger("ai_dm.foundry.validator")
+
 DEFAULT_ACTOR_PATCH_ALLOW: tuple[str, ...] = (
     "name",
     "img",
@@ -49,6 +54,7 @@ DEFAULT_ACTOR_PATCH_ALLOW: tuple[str, ...] = (
     "system.skills.",
     "system.spells.",
     "system.traits.",
+    "system.currency.",
 )
 
 
@@ -127,9 +133,12 @@ class CommandValidator:
                     pass
             if cmd.x is not None and cmd.y is not None:
                 self._check_coords(cmd.x, cmd.y, command_type=cmd.type)
-            elif not cmd.target and not cmd.target_id:
+            elif not cmd.target and not cmd.target_id and not (
+                cmd.direction and cmd.distance_ft
+            ):
                 raise ValidationError(
-                    "move_actor_to requires `target`, `target_id`, or x/y",
+                    "move_actor_to requires `target`, `target_id`, x/y, "
+                    "or direction+distance_ft",
                     code="missing_target",
                     field="target",
                     command_type=cmd.type,
@@ -236,6 +245,57 @@ class CommandValidator:
                 except RegistryMissError:
                     pass  # let JS resolve by name
             self._check_coords(cmd.x, cmd.y, command_type=cmd.type)
+            return
+
+        if isinstance(cmd, GiveItemCommand):
+            # Best-effort actor resolution — the actor may not yet be
+            # in the registry (e.g. brand-new PC seeded from the pack
+            # before its first Foundry sync). Leave the id intact so
+            # the JS side can fall back to a name lookup.
+            try:
+                cmd.actor_id = self.registry.resolve("actor", cmd.actor_id)
+            except RegistryMissError:
+                pass
+            self._require_nonempty(cmd.item_key, "item_key", cmd.type)
+            if cmd.qty <= 0:
+                raise ValidationError(
+                    "qty must be > 0",
+                    code="non_positive",
+                    field="qty",
+                    command_type=cmd.type,
+                )
+            return
+
+        if isinstance(cmd, ApplyDamageCommand):
+            # Best-effort actor resolution; the Foundry side falls
+            # back to a name lookup when the actor isn't yet in the
+            # registry (e.g. a freshly-spawned NPC).
+            original_id = cmd.actor_id
+            try:
+                cmd.actor_id = self.registry.resolve("actor", cmd.actor_id)
+                if cmd.actor_id != original_id:
+                    logger.info(
+                        "validator(apply_damage): registry resolved %r → %r",
+                        original_id, cmd.actor_id,
+                    )
+                else:
+                    logger.debug(
+                        "validator(apply_damage): registry direct hit for %r",
+                        original_id,
+                    )
+            except RegistryMissError:
+                logger.warning(
+                    "validator(apply_damage): no registry entry for actor_id=%r "
+                    "— forwarding raw id to Foundry (will fall back to name match)",
+                    original_id,
+                )
+            if cmd.amount < 0:
+                raise ValidationError(
+                    "amount must be >= 0",
+                    code="non_positive",
+                    field="amount",
+                    command_type=cmd.type,
+                )
             return
 
     # ------------------------------------------------------------------ #

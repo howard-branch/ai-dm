@@ -13,8 +13,8 @@ class _StubDirector:
         self.calls = []
         self._narration = narration
 
-    def handle_player_input(self, text, *, scene_id=None, focus_npcs=None, actor_id=None):
-        self.calls.append({"text": text, "scene_id": scene_id})
+    def handle_player_input(self, text, *, scene_id=None, focus_npcs=None, actor_id=None, origin=None):
+        self.calls.append({"text": text, "scene_id": scene_id, "origin": origin})
         return SimpleNamespace(
             narration=self._narration,
             dialogue=[],
@@ -51,7 +51,7 @@ def test_dispatch_runs_director_and_pushes_narration():
         "scene_id": "s-1", "text": "open the door",
     })
     assert disp.wait_idle(timeout=2.0)
-    assert director.calls == [{"text": "open the door", "scene_id": "s-1"}]
+    assert director.calls == [{"text": "open the door", "scene_id": "s-1", "origin": None}]
     assert len(client.events) == 1
     name, payload = client.events[0]
     assert name == "narration"
